@@ -21,13 +21,18 @@ middleware(['auth', 'verified']);
                 'new_is_active' => true,
                 'show_amount_modal' => false,
                 'selected_amount_scheme' => '',
-                'lot_status' => [],
-                'edit_lot' => [],
+                'selected_amount_financial_year' => '',
+                'new_lot_status' => [],
                 'selected_schemes' => [],
                 'monthly_amounts' => [
                     'January' => 1000, 'February' => 1000, 'March' => 1000, 'April' => 1000,
                     'May' => 1000, 'June' => 1000, 'July' => 1000, 'August' => 1000,
                     'September' => 1000, 'October' => 1000, 'November' => 1000, 'December' => 1000
+                ],
+                'monthly_payment_modes' => [
+                    'January' => '', 'February' => '', 'March' => '', 'April' => '',
+                    'May' => '', 'June' => '', 'July' => '', 'August' => '',
+                    'September' => '', 'October' => '', 'November' => '', 'December' => ''
                 ]
             ]);
 
@@ -40,12 +45,16 @@ middleware(['auth', 'verified']);
                 }
 
                 $mappedAmounts = \App\Models\SchemePaymentAmount::where('financial_year', $this->financial_year)->get();
+                $monthLots = \App\Models\FinancialYearMonthLot::where('financial_year', $this->financial_year)->get();
+                $targetPaymentModes = Codemaster::where('parent_short_code', 'payment_mode')->where('is_active', true)->pluck('name', 'code')->toArray();
 
                 return [
                     'financialYears' => $years,
                     'schemes' => Scheme::where('is_active', true)->get(),
                     'dbMonths' => Month::where('is_active', true)->orderBy('display_order')->pluck('name')->toArray(),
                     'mappedAmounts' => $mappedAmounts,
+                    'monthLots' => $monthLots,
+                    'targetPaymentModes' => $targetPaymentModes,
                 ];
             });
 
@@ -53,38 +62,24 @@ middleware(['auth', 'verified']);
                 if (empty($this->financial_year)) {
                     return;
                 }
-
-                $months = Month::where('is_active', true)->pluck('name')->toArray();
-                $lots = \App\Models\FinancialYearMonthLot::where('financial_year', $this->financial_year)->get();
-                
-                foreach ($months as $month) {
-                    $lot = $lots->firstWhere('month', $month);
-                    $this->lot_status[$month] = [
-                        'regular' => $lot ? $lot->is_regular_lot : false,
-                        'arrear' => $lot ? $lot->is_arrear_lot : false,
-                    ];
-                }
                 
                 $this->show_results = true;
             };
             
-            $toggleEditLot = function ($month) {
-                if (!isset($this->edit_lot[$month])) {
-                    $this->edit_lot[$month] = false;
+            $toggleMappedLot = function ($month, $schemeId, $type) {
+                $lot = \App\Models\FinancialYearMonthLot::firstOrNew([
+                    'financial_year' => $this->financial_year,
+                    'month' => $month,
+                    'scheme_id' => $schemeId
+                ]);
+                
+                if ($type === 'regular') {
+                    $lot->is_regular_lot = !$lot->is_regular_lot;
+                } elseif ($type === 'arrear') {
+                    $lot->is_arrear_lot = !$lot->is_arrear_lot;
                 }
                 
-                if ($this->edit_lot[$month] && !empty($this->financial_year)) {
-                    // Saving state to database
-                    \App\Models\FinancialYearMonthLot::updateOrCreate(
-                        ['financial_year' => $this->financial_year, 'month' => $month],
-                        [
-                            'is_regular_lot' => $this->lot_status[$month]['regular'] ?? false,
-                            'is_arrear_lot' => $this->lot_status[$month]['arrear'] ?? false,
-                        ]
-                    );
-                }
-
-                $this->edit_lot[$month] = !$this->edit_lot[$month];
+                $lot->save();
             };
 
             $mapScheme = function ($month) {
@@ -116,7 +111,20 @@ middleware(['auth', 'verified']);
                     $record->save();
                 }
 
+                \App\Models\FinancialYearMonthLot::updateOrCreate(
+                    [
+                        'financial_year' => $this->financial_year,
+                        'month' => $month,
+                        'scheme_id' => $schemeId
+                    ],
+                    [
+                        'is_regular_lot' => $this->new_lot_status[$month]['regular'] ?? false,
+                        'is_arrear_lot' => $this->new_lot_status[$month]['arrear'] ?? false,
+                    ]
+                );
+
                 $this->selected_schemes[$month] = '';
+                $this->new_lot_status[$month] = ['regular' => false, 'arrear' => false];
             };
 
             $unmapScheme = function ($month, $schemeId) {
@@ -158,9 +166,11 @@ middleware(['auth', 'verified']);
             $saveAmounts = function () {
                 $this->validate([
                     'selected_amount_scheme' => 'required',
+                    'selected_amount_financial_year' => 'required',
                     'monthly_amounts.*' => 'required|numeric|min:0'
                 ], [
                     'selected_amount_scheme.required' => 'Please select a scheme.',
+                    'selected_amount_financial_year.required' => 'Please select a financial year.',
                     'monthly_amounts.*.required' => 'All monthly amounts are required.',
                     'monthly_amounts.*.numeric' => 'Amounts must be valid numbers.',
                 ]);
@@ -168,7 +178,7 @@ middleware(['auth', 'verified']);
                 \App\Models\SchemePaymentAmount::updateOrCreate(
                     [
                         'scheme_id' => $this->selected_amount_scheme,
-                        'financial_year' => $this->financial_year, // Currently selected financial year on the page
+                        'financial_year' => $this->selected_amount_financial_year,
                     ],
                     [
                         'january_amount' => $this->monthly_amounts['January'],
@@ -183,6 +193,18 @@ middleware(['auth', 'verified']);
                         'october_amount' => $this->monthly_amounts['October'],
                         'november_amount' => $this->monthly_amounts['November'],
                         'december_amount' => $this->monthly_amounts['December'],
+                        'january_payment_mode' => $this->monthly_payment_modes['January'] ?? null,
+                        'february_payment_mode' => $this->monthly_payment_modes['February'] ?? null,
+                        'march_payment_mode' => $this->monthly_payment_modes['March'] ?? null,
+                        'april_payment_mode' => $this->monthly_payment_modes['April'] ?? null,
+                        'may_payment_mode' => $this->monthly_payment_modes['May'] ?? null,
+                        'june_payment_mode' => $this->monthly_payment_modes['June'] ?? null,
+                        'july_payment_mode' => $this->monthly_payment_modes['July'] ?? null,
+                        'august_payment_mode' => $this->monthly_payment_modes['August'] ?? null,
+                        'september_payment_mode' => $this->monthly_payment_modes['September'] ?? null,
+                        'october_payment_mode' => $this->monthly_payment_modes['October'] ?? null,
+                        'november_payment_mode' => $this->monthly_payment_modes['November'] ?? null,
+                        'december_payment_mode' => $this->monthly_payment_modes['December'] ?? null,
                     ]
                 );
 
@@ -218,7 +240,7 @@ middleware(['auth', 'verified']);
                 $this->show_modal = false;
             };
         ?>
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
+        <div class="w-full px-4 sm:px-6 lg:px-8 space-y-6">
             
             @if(session('status'))
                 <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
@@ -226,23 +248,18 @@ middleware(['auth', 'verified']);
                 </div>
             @endif
 
-            <!-- Page Header -->
-            <div class="bg-white shadow-sm border border-gray-200 rounded-t-lg overflow-hidden">
-                <div class="px-4 py-4 border-b border-gray-200 flex items-center text-blue-600">
-                    <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"></path></svg>
-                    <h2 class="text-lg font-semibold text-gray-700">Map Financial Year for Payment</h2>
-                </div>
-            </div>
-
-            <!-- Top Panel: Scheme & Financial Year -->
-            <div class="bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden p-5 relative">
-                <!-- Pill Badge -->
-                <div class="inline-block bg-[#0066cc] text-white text-sm font-semibold px-4 py-1.5 rounded-full mb-6">
-                    Scheme & Financial Year
+            <!-- Combined Header & Top Panel -->
+            <div class="bg-white shadow-md border border-gray-200 rounded-lg overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
+                    <div class="flex items-center">
+                        <svg class="w-6 h-6 mr-2 text-blue-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"></path></svg>
+                        <h2 class="text-xl font-bold text-gray-800">Map Financial Year for Payment</h2>
+                    </div>
                 </div>
                 
-                <div class="max-w-xs mb-6">
-                    <label class="block text-sm font-bold text-gray-800 mb-1">Financial Year <span class="text-red-500">*</span></label>
+                <div class="p-6">
+                    <div class="max-w-md mb-6">
+                        <label class="block text-sm font-semibold text-gray-800 mb-2">Select Financial Year <span class="text-red-500">*</span></label>
                     <select wire:model="financial_year" class="block w-full border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm py-2 text-gray-700">
                         @foreach($financialYears as $code => $name)
                             <option value="{{ $code }}">{{ $name }}</option>
@@ -252,13 +269,13 @@ middleware(['auth', 'verified']);
 
                     <!-- Action Buttons -->
                 <div class="flex items-center space-x-3">
-                    <button wire:click="search" class="px-4 py-1.5 bg-[#17a2b8] text-white rounded shadow-sm hover:bg-[#138496] font-semibold text-sm flex items-center transition-colors">
+                    <button wire:click="search" class="px-4 py-1.5 bg-blue-600 text-white rounded shadow-sm hover:bg-blue-700 font-semibold text-sm flex items-center transition-colors">
                         <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                         Search
                     </button>
                     
-                    <button wire:click="openModal" class="px-4 py-1.5 bg-[#ffc107] text-gray-900 rounded shadow-sm hover:bg-[#e0a800] font-semibold text-sm flex items-center transition-colors">
-                        <svg class="w-4 h-4 mr-1.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"></path><path d="M10 9a1 1 0 00-1 1v1H8a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1v-1a1 1 0 00-1-1z"></path></svg>
+                    <button wire:click="openModal" class="px-4 py-1.5 bg-white border border-gray-300 text-gray-800 rounded shadow-sm hover:bg-gray-50 font-semibold text-sm flex items-center transition-colors">
+                        <svg class="w-4 h-4 mr-1.5 text-gray-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"></path><path d="M10 9a1 1 0 00-1 1v1H8a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1v-1a1 1 0 00-1-1z"></path></svg>
                         Add Financial Year
                     </button>
                     
@@ -271,21 +288,8 @@ middleware(['auth', 'verified']);
 
             <!-- Bottom Panel: Add & Map Financial Year -->
             @if($show_results)
-            <div class="bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden p-5">
-                <div class="flex justify-between items-start mb-4">
-                    <div>
-                        <!-- Pill Badge -->
-                        <div class="inline-block bg-[#0066cc] text-white text-sm font-semibold px-4 py-1.5 rounded-full mb-3">
-                            Add & Map Financial Year
-                        </div>
-                        <h3 class="text-sm font-bold text-green-700">Financial Year : 2026-2027</h3>
-                    </div>
-                    
-                    <button class="px-4 py-1.5 bg-[#28a745] text-white rounded shadow-sm hover:bg-[#218838] font-semibold text-sm flex items-center transition-colors">
-                        <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 4v16m8-8H4"></path></svg>
-                        Add New
-                    </button>
-                </div>
+            <div class="bg-white shadow-md border border-gray-200 rounded-lg overflow-hidden p-6">
+
                 
                 <div class="mt-4 overflow-x-auto border border-gray-200 rounded">
                     <table class="min-w-full divide-y divide-gray-200 text-sm">
@@ -297,11 +301,8 @@ middleware(['auth', 'verified']);
                                 <th scope="col" class="px-4 py-3 text-left font-bold text-gray-700 border-r border-gray-200 uppercase text-xs">
                                     Already Mapped Scheme
                                 </th>
-                                <th scope="col" class="px-4 py-3 text-left font-bold text-gray-700 border-r border-gray-200 uppercase text-xs w-48">
+                                <th scope="col" class="px-4 py-3 text-left font-bold text-gray-700 border-r border-gray-200 uppercase text-xs w-auto">
                                     Map Scheme
-                                </th>
-                                <th scope="col" class="px-4 py-3 text-left font-bold text-gray-700 uppercase text-xs w-32">
-                                    Lot Type
                                 </th>
                             </tr>
                         </thead>
@@ -312,21 +313,37 @@ middleware(['auth', 'verified']);
                                     {{ $month }}
                                 </td>
                                 <td class="px-4 py-3 align-top border-r border-gray-200">
-                                    <div class="space-y-3">
+                                    <div class="space-y-4">
                                         @php
                                             $monthField = strtolower($month) . '_amount';
                                             $count = 1;
                                         @endphp
                                         @foreach($mappedAmounts as $mapped)
                                             @if(isset($mapped->$monthField) && $mapped->$monthField > 0)
-                                                @php $sch = $schemes->firstWhere('id', $mapped->scheme_id); @endphp
+                                                @php 
+                                                    $sch = $schemes->firstWhere('id', $mapped->scheme_id);
+                                                    $lot = $monthLots->where('month', $month)->where('scheme_id', $mapped->scheme_id)->first();
+                                                @endphp
                                                 @if($sch)
-                                                    <div class="flex items-start justify-between">
-                                                        <div>
-                                                            <span class="font-bold text-gray-800">{{ $count++ }}.</span> <span class="text-gray-700">{{ $sch->display_name ?? $sch->name }}</span><br>
-                                                            <span class="text-[#0066cc] font-bold text-xs italic">Disbursed Amount : {{ $mapped->$monthField }}</span>
+                                                    <div class="flex items-start justify-between bg-gray-50 p-3 rounded-lg border border-gray-200 shadow-sm">
+                                                        <div class="flex flex-col">
+                                                            <div>
+                                                                <span class="font-bold text-gray-800">{{ $count++ }}.</span> <span class="text-gray-700 font-semibold">{{ $sch->display_name ?? $sch->name }}</span>
+                                                            </div>
+                                                            <span class="text-blue-600 font-bold text-xs italic mt-0.5">Disbursed Amount : {{ $mapped->$monthField }}</span>
+                                                            
+                                                            <div class="flex items-center space-x-4 mt-3">
+                                                                <label class="flex items-center cursor-pointer">
+                                                                    <input type="checkbox" wire:click="toggleMappedLot('{{ $month }}', {{ $sch->id }}, 'regular')" {{ $lot && $lot->is_regular_lot ? 'checked' : '' }} class="form-checkbox h-3.5 w-3.5 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                                                                    <span class="ml-1.5 text-xs text-gray-700 font-medium">Regular Lot</span>
+                                                                </label>
+                                                                <label class="flex items-center cursor-pointer">
+                                                                    <input type="checkbox" wire:click="toggleMappedLot('{{ $month }}', {{ $sch->id }}, 'arrear')" {{ $lot && $lot->is_arrear_lot ? 'checked' : '' }} class="form-checkbox h-3.5 w-3.5 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                                                                    <span class="ml-1.5 text-xs text-gray-700 font-medium">Arrear Lot</span>
+                                                                </label>
+                                                            </div>
                                                         </div>
-                                                        <button wire:click="unmapScheme('{{ $month }}', {{ $mapped->scheme_id }})" class="text-gray-700 hover:text-red-600 transition-colors border-2 border-black rounded px-1 py-0.5 ml-2">
+                                                        <button wire:click="unmapScheme('{{ $month }}', {{ $mapped->scheme_id }})" class="text-gray-500 hover:text-red-600 transition-colors bg-white border border-gray-300 rounded p-1 ml-2 shadow-sm">
                                                             <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>
                                                         </button>
                                                     </div>
@@ -335,47 +352,28 @@ middleware(['auth', 'verified']);
                                         @endforeach
                                     </div>
                                 </td>
-                                <td class="px-4 py-3 align-top border-r border-gray-200 w-64">
-                                    <div class="flex items-center space-x-2">
-                                        <select wire:model="selected_schemes.{{ $month }}" class="border-gray-400 rounded shadow-sm text-sm py-1.5 focus:ring-blue-500 focus:border-blue-500 flex-1">
+                                <td class="px-4 py-3 align-top border-r border-gray-200 w-auto">
+                                    @php
+                                        $mappedSchemeIds = $mappedAmounts->filter(function($m) use ($monthField) {
+                                            return isset($m->$monthField) && $m->$monthField > 0;
+                                        })->pluck('scheme_id')->toArray();
+                                    @endphp
+                                    <div class="flex items-center space-x-3">
+                                        <select wire:model="selected_schemes.{{ $month }}" class="border-gray-400 rounded shadow-sm text-sm py-1.5 focus:ring-blue-500 focus:border-blue-500 min-w-[180px]">
                                             <option value="">Select Scheme</option>
                                             @foreach($schemes as $scheme)
-                                                <option value="{{ $scheme->id }}">{{ $scheme->name }}</option>
+                                                @if(!in_array($scheme->id, $mappedSchemeIds))
+                                                    <option value="{{ $scheme->id }}">{{ $scheme->name }}</option>
+                                                @endif
                                             @endforeach
                                         </select>
-                                        <button wire:click="mapScheme('{{ $month }}')" class="bg-[#28a745] text-white px-3 py-1.5 rounded shadow text-sm font-semibold hover:bg-[#218838] flex items-center transition-colors">
+                                        <button wire:click="mapScheme('{{ $month }}')" class="bg-green-600 text-white px-3 py-1.5 rounded shadow text-sm font-semibold hover:bg-green-700 flex items-center transition-colors whitespace-nowrap self-start mt-1">
                                             <svg class="w-3.5 h-3.5 mr-1" fill="currentColor" viewBox="0 0 20 20"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"></path></svg>
                                             Map
                                         </button>
                                     </div>
                                 </td>
-                                <td class="px-4 py-3 align-top w-32">
-                                    @if(isset($edit_lot[$month]) && $edit_lot[$month])
-                                        <div class="space-y-2">
-                                            <label class="flex items-center cursor-pointer">
-                                                <input type="checkbox" wire:model="lot_status.{{ $month }}.regular" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
-                                                <span class="ml-2 text-sm text-gray-700 font-medium">Regular Lot</span>
-                                            </label>
-                                            <label class="flex items-center cursor-pointer">
-                                                <input type="checkbox" wire:model="lot_status.{{ $month }}.arrear" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
-                                                <span class="ml-2 text-sm text-gray-700 font-medium">Arrear Lot</span>
-                                            </label>
-                                            <button wire:click="toggleEditLot('{{ $month }}')" class="text-xs text-blue-600 underline font-bold">Done</button>
-                                        </div>
-                                    @else
-                                        <div class="flex flex-col items-center">
-                                            <span class="text-[#008080] font-bold text-sm text-center">
-                                                {{ (isset($lot_status[$month]['regular']) && $lot_status[$month]['regular']) ? 'Regular Lot' : '' }}
-                                                {{ (isset($lot_status[$month]['regular']) && $lot_status[$month]['regular'] && isset($lot_status[$month]['arrear']) && $lot_status[$month]['arrear']) ? ' & ' : '' }}
-                                                {{ (isset($lot_status[$month]['arrear']) && $lot_status[$month]['arrear']) ? 'Arrear Lot' : '' }}
-                                                {{ (!isset($lot_status[$month]['regular']) || !$lot_status[$month]['regular']) && (!isset($lot_status[$month]['arrear']) || !$lot_status[$month]['arrear']) ? 'None' : '' }}
-                                            </span>
-                                            <button wire:click="toggleEditLot('{{ $month }}')" class="mt-1 border-2 border-black rounded px-1 py-0.5 hover:bg-gray-100 transition-colors">
-                                                <svg class="w-3.5 h-3.5 text-black" fill="currentColor" viewBox="0 0 20 20"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"></path></svg>
-                                            </button>
-                                        </div>
-                                    @endif
-                                </td>
+
                             </tr>
                             @endforeach
                         </tbody>
@@ -444,27 +442,44 @@ middleware(['auth', 'verified']);
                         </h3>
                     </div>
                     <div class="bg-white px-6 pt-5 pb-6">
-                        <!-- Scheme Selection -->
-                        <div class="mb-6">
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Select Scheme <span class="text-red-500">*</span></label>
-                            <select wire:model="selected_amount_scheme" class="block w-full border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm py-2 text-gray-700">
-                                <option value="">---Select Scheme---</option>
-                                @foreach($schemes as $sch)
-                                    <option value="{{ $sch->id }}">{{ $sch->display_name ?? $sch->name }}</option>
-                                @endforeach
-                            </select>
+                        <!-- Scheme and Financial Year Selection -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Select Scheme <span class="text-red-500">*</span></label>
+                                <select wire:model="selected_amount_scheme" class="block w-full border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm py-2 text-gray-700">
+                                    <option value="">---Select Scheme---</option>
+                                    @foreach($schemes as $sch)
+                                        <option value="{{ $sch->id }}">{{ $sch->display_name ?? $sch->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Select Financial Year <span class="text-red-500">*</span></label>
+                                <select wire:model="selected_amount_financial_year" class="block w-full border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm py-2 text-gray-700">
+                                    <option value="">---Select Financial Year---</option>
+                                    @foreach($financialYears as $code => $name)
+                                        <option value="{{ $code }}">{{ $name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
                         </div>
                         
                         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
                             @foreach(['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'] as $month)
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">{{ $month }} <span class="text-red-500">*</span></label>
-                                <div class="relative rounded-md shadow-sm">
+                                <div class="relative rounded-md shadow-sm mb-2">
                                     <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                         <span class="text-gray-500 sm:text-sm">₹</span>
                                     </div>
                                     <input type="number" wire:model="monthly_amounts.{{ $month }}" class="block w-full pl-7 pr-3 py-2 border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 text-sm text-gray-700" placeholder="0.00">
                                 </div>
+                                <select wire:model="monthly_payment_modes.{{ $month }}" class="block w-full border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm py-1.5 text-gray-700">
+                                    <option value="">Payment Mode</option>
+                                    @foreach($targetPaymentModes as $code => $name)
+                                        <option value="{{ $code }}">{{ $name }}</option>
+                                    @endforeach
+                                </select>
                             </div>
                             @endforeach
                         </div>

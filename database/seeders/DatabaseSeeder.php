@@ -20,13 +20,11 @@ class DatabaseSeeder extends Seeder
             LGD\SubdivisionSeeder::class,
             LGD\MunicipalitiesSeeder::class,
             LGD\WardSeeder::class,
-            MasterMimeTypeSeeder::class,
             Bank\BankSeeder::class,
             Bank\IfscSeeder::class,
             DepartmentSeeder::class,
             CodemasterSeeder::class,
             SchemeSeeder::class,
-            SchemeAttacheDocumentSeeder::class,
             Role\RolePermissionSeeder::class,
             OfficeMaster\RoleOfficeTypeSeeder::class,
             OfficeMaster\OfficeMastersTableSeeder::class,
@@ -41,6 +39,8 @@ class DatabaseSeeder extends Seeder
             UpdateNextLevelRoleIdSeeder::class,
             OpTypeSeeder::class,
             DsPhaseSeeder::class,
+            FinancialYearSeeder::class,
+            MonthSeeder::class,
 
 
         ]);

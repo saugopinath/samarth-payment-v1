@@ -93,6 +93,21 @@ class CodemasterSeeder extends Seeder
                 "short_name" => "ENCDETAILS",
                 "code" => "16",
             ),
+             array(
+                "name" => "Payment Type",
+                "short_name" => "payment_type",
+                "code" => "50",
+            ),
+            array(
+                "name" => "Lot Type",
+                "short_name" => "lot_type",
+                "code" => "59",
+            ),
+             array(
+                "name" => "Payment Mode",
+                "short_name" => "payment_mode",
+                "code" => "520",
+            ),
         );
         foreach ($codemasterParents as $codemasterParent_item) {
             Codemaster::create([
@@ -810,6 +825,54 @@ class CodemasterSeeder extends Seeder
                 "short_name" => "life_certificate_enc",
                 "parent_short_code" => "ENCDETAILS",
                  "code" => "1632",
+            ),
+             array(
+                "name" => "Account Base",
+                "short_name" => "acc_base",
+                "parent_short_code" => "payment_type",
+                 "code" => "5001",
+            ),
+             array(
+                "name" => "ABPS Base",
+                "short_name" => "abps_base",
+                "parent_short_code" => "payment_type",
+                 "code" => "5002",
+            ),
+            array(
+                "name" => "Regular Lot",
+                "short_name" => "regular_lot",
+                "parent_short_code" => "lot_type",
+                 "code" => "5901",
+            ),
+             array(
+                "name" => "Arrer Lot",
+                "short_name" => "arrer_lot",
+                "parent_short_code" => "lot_type",
+                 "code" => "5902",
+            ),
+            array(
+                "name" => "SBI",
+                "short_name" => "sbi",
+                "parent_short_code" => "payment_mode",
+                 "code" => "5201",
+            ),
+             array(
+                "name" => "IFMS",
+                "short_name" => "ifms",
+                "parent_short_code" => "payment_mode",
+                 "code" => "5202",
+            ),
+            array(
+                "name" => "IFMS V3",
+                "short_name" => "ifms-v3",
+                "parent_short_code" => "payment_mode",
+                 "code" => "5203",
+            ),
+             array(
+                "name" => "Bandhan",
+                "short_name" => "Bandhan",
+                "parent_short_code" => "payment_mode",
+                 "code" => "5204",
             ),
         );
         foreach ($codemasterChilds as $codemasterChild_item) {

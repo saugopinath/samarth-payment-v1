@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('months', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->integer('code')->unique();
+            $table->string('code')->unique();
             $table->boolean('is_active')->default(true);
             $table->integer('display_order')->default(0);
             $table->timestamps();

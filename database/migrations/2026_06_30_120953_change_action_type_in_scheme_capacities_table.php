@@ -20,6 +20,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        DB::statement('ALTER TABLE scheme_capacities ALTER COLUMN action_type TYPE SMALLINT USING action_type::smallint');
+        DB::statement('ALTER TABLE scheme_capacities DROP COLUMN action_type');
     }
 };

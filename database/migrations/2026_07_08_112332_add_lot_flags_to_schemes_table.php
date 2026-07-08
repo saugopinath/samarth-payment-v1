@@ -11,8 +11,9 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('dynamic_workflow_labels', function (Blueprint $table) {
-            $table->json('permissions')->nullable()->after('op_type_id');
+        Schema::table('schemes', function (Blueprint $table) {
+            $table->boolean('allow_regular_lot')->default(true);
+            $table->boolean('allow_arrear_lot')->default(true);
         });
     }
 
@@ -21,8 +22,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('dynamic_workflow_labels', function (Blueprint $table) {
-            $table->dropColumn('permissions');
+        Schema::table('schemes', function (Blueprint $table) {
+            $table->dropColumn(['allow_regular_lot', 'allow_arrear_lot']);
         });
     }
 };

@@ -19,7 +19,9 @@ class Scheme extends Model
         'base_amount',
         'allow_entry',
         'allow_verification',
-        'allow_approval'
+        'allow_approval',
+        'allow_regular_lot',
+        'allow_arrear_lot'
     ];
 
     protected $casts = [
@@ -27,6 +29,8 @@ class Scheme extends Model
         'allow_entry' => 'boolean',
         'allow_verification' => 'boolean',
         'allow_approval' => 'boolean',
+        'allow_regular_lot' => 'boolean',
+        'allow_arrear_lot' => 'boolean',
     ];
 
 

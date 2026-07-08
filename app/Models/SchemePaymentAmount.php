@@ -24,5 +24,17 @@ class SchemePaymentAmount extends Model
         'october_amount',
         'november_amount',
         'december_amount',
+        'january_payment_mode',
+        'february_payment_mode',
+        'march_payment_mode',
+        'april_payment_mode',
+        'may_payment_mode',
+        'june_payment_mode',
+        'july_payment_mode',
+        'august_payment_mode',
+        'september_payment_mode',
+        'october_payment_mode',
+        'november_payment_mode',
+        'december_payment_mode',
     ];
 }
