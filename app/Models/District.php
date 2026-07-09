@@ -1,53 +1,72 @@
 <?php
 
+/**
+ * Created by Reliese Model.
+ */
+
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * Class District
+ * 
+ * @property int $id
+ * @property string|null $ref_code
+ * @property string $lgd_code
+ * @property string $name
+ * @property string $short_name
+ * @property string|null $local_name
+ * @property int $state_id
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * @property int $is_active
+ * 
+ * @property State $state
+ * @property Collection|Block[] $blocks
+ * @property Collection|Subdivision[] $subdivisions
+ * @property Collection|OfficeMaster[] $office_masters
+ *
+ * @package App\Models
+ */
 class District extends Model
 {
-    protected $fillable = [
-        'name',
-        'ref_code',
-        'lgd_code',
-        'short_name',
-        'state_id',
-    ];
-    public const BENEFICIARY_LOCATION_COLUMN = 'created_by_dist_code';
-    public function State(): BelongsTo
-    {
-        return $this->belongsTo(State::class);
-    }
+	protected $table = 'districts';
 
-    public function blocks()
-    {
-        return $this->hasMany(Block::class);
-    }
+	protected $casts = [
+		'state_id' => 'int',
+		'is_active' => 'int'
+	];
 
-    // public function municipalities()
-    // {
-    //     return $this->hasMany(Municipality::class);
-    // }
+	protected $fillable = [
+		'ref_code',
+		'lgd_code',
+		'name',
+		'short_name',
+		'local_name',
+		'state_id',
+		'is_active'
+	];
 
-    public function subdivisions()
-    {
-        return $this->hasMany(Subdivision::class);
-    }
+	public function state()
+	{
+		return $this->belongsTo(State::class);
+	}
 
-    public function municipalities()
-    {
-        return $this->hasManyThrough(
-            Municipality::class,
-            Subdivision::class,
-            'district_id',
-            'subdivision_id',
-            'id',
-            'id'
-        );
-    }
-    public function capacities()
-    {
-        return $this->morphMany(SchemeCapacity::class, 'modelable', 'model_type', 'model_id');
-    }
+	public function blocks()
+	{
+		return $this->hasMany(Block::class);
+	}
+
+	public function subdivisions()
+	{
+		return $this->hasMany(Subdivision::class);
+	}
+
+	public function office_masters()
+	{
+		return $this->hasMany(OfficeMaster::class);
+	}
 }

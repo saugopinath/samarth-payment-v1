@@ -1,186 +1,121 @@
 <?php
 
+/**
+ * Created by Reliese Model.
+ */
+
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Notifications\Notifiable;
-use Illuminate\Support\Facades\Auth;
-use OwenIt\Auditing\Contracts\Auditable;
-use Spatie\Permission\Traits\HasRoles;
-use Tymon\JWTAuth\Contracts\JWTSubject;
-use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
 
-
-class User extends Authenticatable implements Auditable, JWTSubject
+/**
+ * Class User
+ * 
+ * @property int $id
+ * @property string $name
+ * @property string $email
+ * @property Carbon|null $email_verified_at
+ * @property string $password
+ * @property string|null $remember_token
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * @property string $mobile_no
+ * @property int $flag_sent_otp
+ * @property bool|null $first_time_set_password
+ * @property Carbon|null $password_set_time
+ * @property Carbon|null $password_expires_at
+ * @property string|null $last_otp
+ * @property Carbon|null $last_otp_generation_time
+ * @property Carbon|null $last_otp_expire_time
+ * @property int $is_active
+ * @property int $is_login
+ * @property bool $bypass_otp
+ * @property string|null $current_session_id
+ * @property bool $allow_multi_session
+ * @property string|null $designation
+ * 
+ * @property Collection|UserPersonal[] $user_personals
+ * @property Collection|AcceptRejectInfo[] $accept_reject_infos
+ * @property Collection|PasswordHistory[] $password_histories
+ * @property Collection|Role[] $roles
+ * @property Collection|Scheme[] $schemes
+ *
+ * @package App\Models
+ */
+class User extends Model
 {
-    use HasFactory, HasRoles, Notifiable;
-    use LogsActivity;
-    use \OwenIt\Auditing\Auditable;
+	protected $table = 'users';
 
-    public $audit_old_permissions;
+	protected $casts = [
+		'email_verified_at' => 'datetime',
+		'flag_sent_otp' => 'int',
+		'first_time_set_password' => 'bool',
+		'password_set_time' => 'datetime',
+		'password_expires_at' => 'datetime',
+		'last_otp_generation_time' => 'datetime',
+		'last_otp_expire_time' => 'datetime',
+		'is_active' => 'int',
+		'is_login' => 'int',
+		'bypass_otp' => 'bool',
+		'allow_multi_session' => 'bool'
+	];
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
-    protected $fillable = [
-        'name',
-        'email',
-        'scheme_id',
-        'password',
-        'two_factor_code',
-        'two_factor_expires_at',
-        'flag_sent_otp',
-        'password_set_time',
-        'password_expires_at',
-        'updated_at',
-        'mobile_no',
-        'is_active',
-        'designation',
-        'bypass_otp',
-        'current_session_id',
-        'allow_multi_session',
-    ];
+	protected $hidden = [
+		'password',
+		'remember_token',
+		'first_time_set_password'
+	];
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var array<int, string>
-     */
-    protected $hidden = [
-        'password',
-        'remember_token',
-    ];
+	protected $fillable = [
+		'name',
+		'email',
+		'email_verified_at',
+		'password',
+		'remember_token',
+		'mobile_no',
+		'flag_sent_otp',
+		'first_time_set_password',
+		'password_set_time',
+		'password_expires_at',
+		'last_otp',
+		'last_otp_generation_time',
+		'last_otp_expire_time',
+		'is_active',
+		'is_login',
+		'bypass_otp',
+		'current_session_id',
+		'allow_multi_session',
+		'designation'
+	];
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
-    protected function casts(): array
-    {
-        return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
-            'is_active' => 'boolean',
-            'bypass_otp' => 'boolean',
-        ];
-    }
+	public function user_personals()
+	{
+		return $this->hasMany(UserPersonal::class);
+	}
 
-    public function RoleSchemeOfficeMappings(): HasMany
-    {
+	public function accept_reject_infos()
+	{
+		return $this->hasMany(AcceptRejectInfo::class);
+	}
 
-        return $this->hasMany(UserRoleSchemeOfficeMapping::class);
-    }
+	public function password_histories()
+	{
+		return $this->hasMany(PasswordHistory::class);
+	}
 
-    public function mappedRoles(): BelongsToMany
-    {
-        return $this->belongsToMany(
-            Role::class,
-            'user_role_scheme_office_mappings',
-            'user_id',
-            'role_id'
-        )
-            ->wherePivot('is_active', 1)
-            ->where('roles.id', '!=', 10);
-    }
+	public function roles()
+	{
+		return $this->belongsToMany(Role::class, 'user_role_scheme_office_mappings')
+					->withPivot('id', 'office_id', 'scheme_id', 'is_active')
+					->withTimestamps();
+	}
 
-    /**
-     * Direct permissions assigned to the user (not via roles)
-     */
-    public function mappedPermissions(): BelongsToMany
-    {
-        return $this->morphToMany(
-            Permission::class,
-            'model',
-            'model_has_permissions',
-            'model_id',
-            'permission_id'
-        )->withPivot('scheme_id');
-    }
-
-    public function givePermissionWithScheme($permissionId, $schemeId)
-    {
-        // Check already exists
-        $exists = $this->mappedPermissions()
-            ->wherePivot('permission_id', $permissionId)
-            ->wherePivot('scheme_id', $schemeId)
-            ->exists();
-
-        if (! $exists) {
-
-            $this->mappedPermissions()->attach(
-                $permissionId,
-                [
-                    'scheme_id' => $schemeId,
-                ]
-            );
-
-        }
-    }
-
-    public function transformAudit(array $data): array
-    {
-        $userId = Auth::id();
-        $userRole = UserRoleSchemeOfficeMapping::where('user_id', $userId)
-            ->value('role_id');
-
-        $data['tags'] = class_basename($this).'_'.($data['event'] ?? 'unknown');
-        $data['session_id'] = session()->getId();
-
-        $data['other_details'] = json_encode([
-            'updated_by_role' => $userRole,
-            'user_agent' => request()->userAgent(),
-            'url' => request()->fullUrl(),
-            'method' => request()->method(),
-            'referrer' => request()->header('referer'),
-        ]);
-
-        if (app()->has('livewire_action_log_id')) {
-            $data['livewire_action_log_id'] = (string) app('livewire_action_log_id');
-        }
-
-        if (app()->has('user_page_visit_log_id')) {
-            $data['user_page_visit_log_id'] = (string) app('user_page_visit_log_id');
-        }
-
-        // ⭐ Custom: Include Permissions in the Audit
-        if ($data['event'] === 'updated' && isset($this->audit_old_permissions)) {
-            $data['old_values']['permissions'] = $this->audit_old_permissions;
-            $data['new_values']['permissions'] = $this->permissions->pluck('name')->toArray();
-        }
-
-        return $data;
-    }
-
-    public function getJWTIdentifier()
-    {
-        return $this->getKey();
-    }
-
-    public function getJWTCustomClaims()
-    {
-        return [];
-    }
-
-    public function passwordHistories(): HasMany
-    {
-        return $this->hasMany(PasswordHistory::class)->orderBy('created_at', 'desc');
-    }
-
-    public function recordPasswordHistory($hashedPassword, $limit = 5)
-    {
-        $this->passwordHistories()->create(['password' => $hashedPassword]);
-
-        // Keep only the last $limit passwords
-        $histories = $this->passwordHistories()->pluck('id');
-        if ($histories->count() > $limit) {
-            PasswordHistory::whereIn('id', $histories->slice($limit))->delete();
-        }
-    }
+	public function schemes()
+	{
+		return $this->belongsToMany(Scheme::class, 'user_role_scheme_office_mappings')
+					->withPivot('id', 'role_id', 'office_id', 'is_active')
+					->withTimestamps();
+	}
 }

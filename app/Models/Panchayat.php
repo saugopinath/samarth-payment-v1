@@ -1,23 +1,56 @@
 <?php
 
+/**
+ * Created by Reliese Model.
+ */
+
 namespace App\Models;
 
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+/**
+ * Class Panchayat
+ * 
+ * @property int $id
+ * @property string $lgd_code
+ * @property string $ref_code
+ * @property string $name
+ * @property int $block_id
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * @property int $is_active
+ * 
+ * @property Block $block
+ * @property Collection|OfficeMaster[] $office_masters
+ *
+ * @package App\Models
+ */
 class Panchayat extends Model
 {
-    protected $fillable = [
-            'name',
-            'ref_code',
-            'lgd_code',
-            'block_id',
-        ];
+	protected $table = 'panchayats';
 
-    
+	protected $casts = [
+		'block_id' => 'int',
+		'is_active' => 'int'
+	];
 
-    public function Block(): BelongsTo
-    {
-         return $this->BelongsTo(Block::class);
-        
-    }
+	protected $fillable = [
+		'lgd_code',
+		'ref_code',
+		'name',
+		'block_id',
+		'is_active'
+	];
+
+	public function block()
+	{
+		return $this->belongsTo(Block::class);
+	}
+
+	public function office_masters()
+	{
+		return $this->hasMany(OfficeMaster::class);
+	}
 }

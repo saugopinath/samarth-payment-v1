@@ -1,36 +1,64 @@
 <?php
 
+/**
+ * Created by Reliese Model.
+ */
+
 namespace App\Models;
 
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * Class Municipality
+ * 
+ * @property int $id
+ * @property string $lgd_code
+ * @property string|null $ref_code
+ * @property string $name
+ * @property string|null $local_name
+ * @property int $subdivision_id
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * @property int $is_active
+ * 
+ * @property Subdivision $subdivision
+ * @property Collection|Ward[] $wards
+ * @property Collection|OfficeMaster[] $office_masters
+ *
+ * @package App\Models
+ */
 class Municipality extends Model
 {
-    protected $table = 'municipalities';
-    protected $fillable = [
-        'name',
-        'ref_code',
-        'lgd_code',
-        'district_id',
-        'subdivision_id',
-        'state_id',
-    ];
+	protected $table = 'municipalities';
 
+	protected $casts = [
+		'subdivision_id' => 'int',
+		'is_active' => 'int'
+	];
 
-    public function Subdivision(): BelongsTo
-    {
-        return $this->belongsTo(Subdivision::class);
-    }
+	protected $fillable = [
+		'lgd_code',
+		'ref_code',
+		'name',
+		'local_name',
+		'subdivision_id',
+		'is_active'
+	];
 
+	public function subdivision()
+	{
+		return $this->belongsTo(Subdivision::class);
+	}
 
-    public function district()
-    {
-        return $this->belongsTo(District::class);
-    }
+	public function wards()
+	{
+		return $this->hasMany(Ward::class);
+	}
 
-    public function wards()
-    {
-        return $this->hasMany(Ward::class);
-    }
+	public function office_masters()
+	{
+		return $this->hasMany(OfficeMaster::class, 'municipalitiy_id');
+	}
 }

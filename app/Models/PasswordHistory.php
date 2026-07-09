@@ -1,21 +1,46 @@
 <?php
 
+/**
+ * Created by Reliese Model.
+ */
+
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * Class PasswordHistory
+ * 
+ * @property int $id
+ * @property int $user_id
+ * @property string $password
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * 
+ * @property User $user
+ *
+ * @package App\Models
+ */
 class PasswordHistory extends Model
 {
-    use HasFactory;
+	protected $table = 'password_histories';
 
-    protected $fillable = [
-        'user_id',
-        'password',
-    ];
+	protected $casts = [
+		'user_id' => 'int'
+	];
 
-    public function user()
-    {
-        return $this->belongsTo(User::class);
-    }
+	protected $hidden = [
+		'password'
+	];
+
+	protected $fillable = [
+		'user_id',
+		'password'
+	];
+
+	public function user()
+	{
+		return $this->belongsTo(User::class);
+	}
 }

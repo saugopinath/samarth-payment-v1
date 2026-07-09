@@ -1,31 +1,55 @@
 <?php
 
+/**
+ * Created by Reliese Model.
+ */
+
 namespace App\Models;
 
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * Class Codemaster
+ * 
+ * @property int $id
+ * @property string $name
+ * @property string $short_name
+ * @property int|null $parent_id
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * @property int $is_active
+ * @property string|null $code
+ * @property int|null $rank
+ * @property string|null $parent_short_code
+ * 
+ * @property Collection|AcceptRejectInfo[] $accept_reject_infos
+ *
+ * @package App\Models
+ */
 class Codemaster extends Model
 {
-    protected $fillable = [
-        'name',
-        'short_name',
-        'parent_id',
-        'parent_short_code',
-        'code',
-        'is_active',
-    ];
-    public function parent()
-    {
-        return $this->belongsTo(Codemaster::class, 'parent_id');
-    }
-    public function children()
-    {
-        return $this->hasMany(Codemaster::class, 'parent_id');
-    }
-    public static function getIdByCode($code)
-    {
-        return self::where('code', $code)->value('id');
-    }
+	protected $table = 'codemasters';
 
-   
+	protected $casts = [
+		'parent_id' => 'int',
+		'is_active' => 'int',
+		'rank' => 'int'
+	];
+
+	protected $fillable = [
+		'name',
+		'short_name',
+		'parent_id',
+		'is_active',
+		'code',
+		'rank',
+		'parent_short_code'
+	];
+
+	public function accept_reject_infos()
+	{
+		return $this->hasMany(AcceptRejectInfo::class, 'revert_reason_cause_id');
+	}
 }

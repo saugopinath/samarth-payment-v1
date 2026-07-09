@@ -1,96 +1,70 @@
 <?php
 
+/**
+ * Created by Reliese Model.
+ */
+
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Model;
 
-class UserRoleSchemeOfficeMapping extends BaseAuditableModel
+/**
+ * Class UserRoleSchemeOfficeMapping
+ * 
+ * @property int $id
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * @property int $user_id
+ * @property int $role_id
+ * @property int $office_id
+ * @property int $scheme_id
+ * @property int $is_active
+ * 
+ * @property User $user
+ * @property Role $role
+ * @property OfficeMaster $office_master
+ * @property Scheme $scheme
+ *
+ * @package App\Models
+ */
+class UserRoleSchemeOfficeMapping extends Model
 {
-    protected $fillable = [
-            'user_id',
-            'office_id',
-            'scheme_id',
-            'role_id'
-        ];
-    protected static function booted(): void
-    {
+	protected $table = 'user_role_scheme_office_mappings';
 
-        /**
-         * Call After Post Create
-         */
-        static::created(function (UserRoleSchemeOfficeMapping $mapdata) {
-            $scheme_id = (int) $mapdata->scheme_id;
-            app(\Spatie\Permission\PermissionRegistrar::class)->setPermissionsTeamId($scheme_id);
+	protected $casts = [
+		'user_id' => 'int',
+		'role_id' => 'int',
+		'office_id' => 'int',
+		'scheme_id' => 'int',
+		'is_active' => 'int'
+	];
 
-            $user = User::find($mapdata->user_id);
-            if ($user) {
-                $role = Role::find($mapdata->role_id);
-                if ($role) {
-                    $user->assignRole($role);
-                }
-            }
-        });
+	protected $fillable = [
+		'user_id',
+		'role_id',
+		'office_id',
+		'scheme_id',
+		'is_active'
+	];
 
-        /**
-         * After Update
-         */
-        static::updated(function (UserRoleSchemeOfficeMapping $mapdata) {
-            if ($mapdata->wasChanged('role_id')) {
-                $oldRoleId = $mapdata->getOriginal('role_id');
-                $newRoleId = $mapdata->role_id;
-                $scheme_id = (int) $mapdata->scheme_id;
+	public function user()
+	{
+		return $this->belongsTo(User::class);
+	}
 
-                app(\Spatie\Permission\PermissionRegistrar::class)->setPermissionsTeamId($scheme_id);
-                $user = User::find($mapdata->user_id);
+	public function role()
+	{
+		return $this->belongsTo(Role::class);
+	}
 
-                if ($user) {
-                    $oldRole = Role::find($oldRoleId);
-                    $newRole = Role::find($newRoleId);
+	public function office_master()
+	{
+		return $this->belongsTo(OfficeMaster::class, 'office_id');
+	}
 
-                    if ($oldRole) {
-                        $user->removeRole($oldRole);
-                    }
-                    if ($newRole) {
-                        $user->assignRole($newRole);
-                    }
-                }
-            }
-        });
-
-        /**
-         * After Delete
-         */
-        static::deleted(function (UserRoleSchemeOfficeMapping $mapdata) {
-            $scheme_id = (int) $mapdata->scheme_id;
-            app(\Spatie\Permission\PermissionRegistrar::class)->setPermissionsTeamId($scheme_id);
-
-            $user = User::find($mapdata->user_id);
-            if ($user) {
-                $role = Role::find($mapdata->role_id);
-                if ($role) {
-                    $user->removeRole($role);
-                }
-            }
-        });
-
-    }
-   public function User(): BelongsTo
-    {
-        return $this->belongsTo(User::class);
-    }
-    public function Office(): BelongsTo
-    {
-        return $this->belongsTo(OfficeMaster::class);
-    }
-    public function Scheme(): BelongsTo
-    {
-        return $this->belongsTo(Scheme::class);
-    }
-    public function Role(): BelongsTo
-    {
-        return $this->belongsTo(Role::class);
-    }
-
-
-
+	public function scheme()
+	{
+		return $this->belongsTo(Scheme::class);
+	}
 }

@@ -1,75 +1,137 @@
 <?php
 
+/**
+ * Created by Reliese Model.
+ */
+
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
 
-
-class OfficeMaster extends BaseAuditableModel
+/**
+ * Class OfficeMaster
+ * 
+ * @property int $id
+ * @property string $name
+ * @property string|null $address
+ * @property string|null $zip
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * @property int $office_type_id
+ * @property int $state_id
+ * @property int|null $district_id
+ * @property int|null $block_id
+ * @property int|null $subdivision_id
+ * @property int|null $municipalitiy_id
+ * @property int|null $ward_id
+ * @property int|null $panchayat_id
+ * @property int $is_active
+ * @property int|null $max_operator
+ * @property int|null $max_verifier
+ * @property int|null $max_enquiry_officer
+ * @property int|null $parent_id
+ * 
+ * @property State $state
+ * @property District|null $district
+ * @property Block|null $block
+ * @property Subdivision|null $subdivision
+ * @property Municipality|null $municipality
+ * @property Ward|null $ward
+ * @property Panchayat|null $panchayat
+ * @property OfficeMaster|null $office_master
+ * @property Collection|OfficeMaster[] $office_masters
+ * @property Collection|UserRoleSchemeOfficeMapping[] $user_role_scheme_office_mappings
+ *
+ * @package App\Models
+ */
+class OfficeMaster extends Model
 {
-    use HasFactory;
-    protected $fillable = [
-        'name',
-        'parent_id',
-        'address',
-        'zip',
-        'office_type_id',
-        'state_id',
-        'district_id',
-        'subdivision_id',
-        'municipalitiy_id',
-        'ward_id',
-        'block_id',
-        'panchayat_id',
-        'is_active',
-        'scheme_id',
-        'max_operator',
-        'max_verifier',
-        'max_enquiry_officer'
-    ];
+	protected $table = 'office_masters';
 
-    public function officeType()
-    {
-        return $this->belongsTo(Codemaster::class, 'office_type_id', 'code');
-    }
+	protected $casts = [
+		'office_type_id' => 'int',
+		'state_id' => 'int',
+		'district_id' => 'int',
+		'block_id' => 'int',
+		'subdivision_id' => 'int',
+		'municipalitiy_id' => 'int',
+		'ward_id' => 'int',
+		'panchayat_id' => 'int',
+		'is_active' => 'int',
+		'max_operator' => 'int',
+		'max_verifier' => 'int',
+		'max_enquiry_officer' => 'int',
+		'parent_id' => 'int'
+	];
 
-    public function parent()
-    {
-        return $this->belongsTo(OfficeMaster::class, 'parent_id');
-    }
+	protected $fillable = [
+		'name',
+		'address',
+		'zip',
+		'office_type_id',
+		'state_id',
+		'district_id',
+		'block_id',
+		'subdivision_id',
+		'municipalitiy_id',
+		'ward_id',
+		'panchayat_id',
+		'is_active',
+		'max_operator',
+		'max_verifier',
+		'max_enquiry_officer',
+		'parent_id'
+	];
 
-    public function children()
-    {
-        return $this->hasMany(OfficeMaster::class, 'parent_id');
-    }
+	public function state()
+	{
+		return $this->belongsTo(State::class);
+	}
 
-    public function state()
-    {
-        return $this->belongsTo(State::class, 'state_id', 'id');
-    }
+	public function district()
+	{
+		return $this->belongsTo(District::class);
+	}
 
-    public function district()
-    {
-        return $this->belongsTo(District::class, 'district_id', 'id');
-    }
-    public function block()
-    {
-        return $this->belongsTo(Block::class, 'block_id', 'id');
-    }
-    public function subdivision()
-    {
-        return $this->belongsTo(Subdivision::class, 'subdivision_id', 'id');
-    }
-    public function municipality()
-    {
-        return $this->belongsTo(Municipality::class, 'municipalitiy_id', 'id');
-    }
-    public function gp()
-    {
-        return $this->belongsTo(Panchayat::class, 'panchayat_id', 'id');
-    }
-    public function ward()
-    {
-        return $this->belongsTo(Ward::class, 'ward_id', 'id');
-    }
+	public function block()
+	{
+		return $this->belongsTo(Block::class);
+	}
+
+	public function subdivision()
+	{
+		return $this->belongsTo(Subdivision::class);
+	}
+
+	public function municipality()
+	{
+		return $this->belongsTo(Municipality::class, 'municipalitiy_id');
+	}
+
+	public function ward()
+	{
+		return $this->belongsTo(Ward::class);
+	}
+
+	public function panchayat()
+	{
+		return $this->belongsTo(Panchayat::class);
+	}
+
+	public function office_master()
+	{
+		return $this->belongsTo(OfficeMaster::class, 'parent_id');
+	}
+
+	public function office_masters()
+	{
+		return $this->hasMany(OfficeMaster::class, 'parent_id');
+	}
+
+	public function user_role_scheme_office_mappings()
+	{
+		return $this->hasMany(UserRoleSchemeOfficeMapping::class, 'office_id');
+	}
 }

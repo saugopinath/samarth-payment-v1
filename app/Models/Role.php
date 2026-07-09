@@ -1,109 +1,76 @@
 <?php
 
+/**
+ * Created by Reliese Model.
+ */
+
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Concerns\HasUlids;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Spatie\Permission\Models\Role as SpatieRole;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use OwenIt\Auditing\Contracts\Auditable;
-use Illuminate\Support\Facades\Auth;
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
 
-class Role extends SpatieRole implements Auditable
+/**
+ * Class Role
+ * 
+ * @property int $id
+ * @property string $name
+ * @property string $guard_name
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * @property int|null $rank
+ * @property bool $is_active
+ * 
+ * @property Collection|RoleOfficeTypeMapping[] $role_office_type_mappings
+ * @property Collection|User[] $users
+ * @property Collection|Scheme[] $schemes
+ * @property Collection|ModelHasRole[] $model_has_roles
+ * @property Collection|Permission[] $permissions
+ *
+ * @package App\Models
+ */
+class Role extends Model
 {
-    use HasFactory;
-    use \OwenIt\Auditing\Auditable;
+	protected $table = 'roles';
 
-    protected $table = 'roles';
-    public $timestamps = true;
+	protected $casts = [
+		'rank' => 'int',
+		'is_active' => 'bool'
+	];
 
-    public $audit_old_permissions;
+	protected $fillable = [
+		'name',
+		'guard_name',
+		'rank',
+		'is_active'
+	];
 
-    /**
-     * The model's default values for attributes.
-     *
-     * @var array
-     */
-    protected $attributes = [
-        'guard_name'     => 'web',
-        // 'can_manage_roles' => '[]',
-    ];
+	public function role_office_type_mappings()
+	{
+		return $this->hasMany(RoleOfficeTypeMapping::class);
+	}
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
-    protected $fillable = [
-        'name',
-        // 'parent_role_id',
-        // 'can_manage_roles'
-    ];
+	public function users()
+	{
+		return $this->belongsToMany(User::class, 'user_role_scheme_office_mappings')
+					->withPivot('id', 'office_id', 'scheme_id', 'is_active')
+					->withTimestamps();
+	}
 
-    /**
-     * The attributes that should be cast.
-     *
-     * @var array<string, string>
-     */
+	public function schemes()
+	{
+		return $this->belongsToMany(Scheme::class, 'user_role_scheme_office_mappings')
+					->withPivot('id', 'user_id', 'office_id', 'is_active')
+					->withTimestamps();
+	}
 
-    public function parentRole()
-    {
-        return $this->belongsTo(self::class, 'parent_role_id');
-    }
+	public function model_has_roles()
+	{
+		return $this->hasMany(ModelHasRole::class);
+	}
 
-    public function childRoles()
-    {
-        return $this->hasMany(self::class, 'parent_role_id');
-    }
-    public function MapOfficeType(): HasMany
-    {
-        return $this->hasMany(RoleOfficeTypeMapping::class);
-    }
-    public function mappedPermissions(): BelongsToMany
-    {
-        return $this->belongsToMany(
-            Permission::class,         // related model
-            'role_has_permissions',    // pivot table
-            'role_id',                 // foreign key on pivot for this model (Role)
-            'permission_id'            // related key on pivot (Permission)
-        );
-    }
-
-    public function transformAudit(array $data): array
-    {
-        $userId = Auth::id();
-        $userRole = UserRoleSchemeOfficeMapping::where('user_id', $userId)
-            ->value('role_id');
-        $data['tags'] = class_basename($this) . '_' . $data['event'];
-        $data['session_id'] = session()->getId();
-        // $data['other_details'] = [
-        //     'updated_by_role' => $userRole,
-        //     'user_agent' => \Illuminate\Support\Facades\Request::userAgent(),
-        //     'url' => \Illuminate\Support\Facades\Request::fullUrl(),
-        //     'method' => \Illuminate\Support\Facades\Request::method(),
-        //     'referrer' => \Illuminate\Support\Facades\Request::header('referer'),
-        // ];
-        $data['other_details'] = json_encode([
-            'updated_by_role' => $userRole,
-            'user_agent' => request()->userAgent(),
-            'url' => request()->fullUrl(),
-            'method' => request()->method(),
-            'referrer' => request()->header('referer'),
-        ]);
-        if (app()->has('livewire_action_log_id')) {
-            $data['livewire_action_log_id'] = (string) app('livewire_action_log_id');
-        }
-        if (app()->has('user_page_visit_log_id')) {
-            $data['user_page_visit_log_id'] = (string) app('user_page_visit_log_id');
-        }
-
-        if ($data['event'] === 'updated' && isset($this->audit_old_permissions)) {
-            $data['old_values']['permissions'] = $this->audit_old_permissions;
-            $data['new_values']['permissions'] = $this->permissions->pluck('name')->toArray();
-        }
-
-        return $data;
-    }
+	public function permissions()
+	{
+		return $this->belongsToMany(Permission::class, 'role_has_permissions');
+	}
 }
