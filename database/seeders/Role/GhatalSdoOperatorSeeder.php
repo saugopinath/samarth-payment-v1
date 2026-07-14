@@ -2,7 +2,7 @@
 
 namespace Database\Seeders\Role;
 
-use App\Models\Role;
+use Spatie\Permission\Models\Role;
 use App\Models\User;
 use App\Models\UserPersonal;
 use Illuminate\Support\Facades\Hash;
@@ -39,7 +39,7 @@ class GhatalSdoOperatorSeeder extends Seeder
             'user_id' => $user->id,
             'name' => $user->name,
         ]);
-        $user->assignRole($role);
+//        $user->assignRole($role);
         $user_office = UserRoleSchemeOfficeMapping::create([
             'user_id' =>  $user->id,
             'scheme_id' => $scheme->id,

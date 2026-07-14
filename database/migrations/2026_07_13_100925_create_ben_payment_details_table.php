@@ -18,6 +18,7 @@ return new class extends Migration
     public function up(): void
     {
         DB::statement('CREATE SCHEMA IF NOT EXISTS payment');
+        DB::statement('DROP TABLE IF EXISTS payment.ben_payment_details CASCADE');
 
         DB::statement('
             CREATE TABLE IF NOT EXISTS payment.ben_payment_details

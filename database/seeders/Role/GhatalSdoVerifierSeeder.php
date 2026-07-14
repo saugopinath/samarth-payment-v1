@@ -2,7 +2,7 @@
 
 namespace Database\Seeders\Role;
 
-use App\Models\Role;
+use Spatie\Permission\Models\Role;
 use App\Models\User;
 use App\Models\UserPersonal;
 use Illuminate\Support\Facades\Hash;
@@ -40,7 +40,7 @@ class GhatalSdoVerifierSeeder extends Seeder
             'user_id' => $user_verifier->id,
             'name' => $user_verifier->name,
         ]);
-        $user_verifier->assignRole($role_verifier);
+//        $user_verifier->assignRole($role_verifier);
         $user_office = UserRoleSchemeOfficeMapping::create([
             'user_id' =>  $user_verifier->id,
             'scheme_id' => $scheme->id,
@@ -61,7 +61,7 @@ class GhatalSdoVerifierSeeder extends Seeder
             'user_id' => $user_delegated_verifier->id,
             'name' => $user_delegated_verifier->name,
         ]);
-        $user_delegated_verifier->assignRole($role_delegated_verifier);
+//        $user_delegated_verifier->assignRole($role_delegated_verifier);
         $user_office = UserRoleSchemeOfficeMapping::create([
             'user_id' =>  $user_delegated_verifier->id,
             'scheme_id' => $scheme->id,

@@ -2,7 +2,7 @@
 
 namespace Database\Seeders\Role;
 
-use App\Models\Role;
+use Spatie\Permission\Models\Role;
 use App\Models\User;
 use App\Models\UserPersonal;
 use Illuminate\Support\Facades\Hash;
@@ -40,7 +40,7 @@ class WbHodSeeder extends Seeder
             'user_id' => $user_hod->id,
             'name' => $user_hod->name,
         ]);
-        $user_hod->assignRole($role_hod);
+//        $user_hod->assignRole($role_hod);
         $user_office = UserRoleSchemeOfficeMapping::create([
             'user_id' =>  $user_hod->id,
             'scheme_id' => $scheme->id,
@@ -62,7 +62,7 @@ class WbHodSeeder extends Seeder
             'user_id' => $user_delegated_hod->id,
             'name' => $user_delegated_hod->name,
         ]);
-        $user_delegated_hod->assignRole($role_delegated_hod);
+//        $user_delegated_hod->assignRole($role_delegated_hod);
         $user_office = UserRoleSchemeOfficeMapping::create([
             'user_id' =>  $user_delegated_hod->id,
             'scheme_id' => $scheme->id,

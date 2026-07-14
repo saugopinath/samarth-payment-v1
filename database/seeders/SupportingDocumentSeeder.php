@@ -7,7 +7,7 @@ use Illuminate\Database\Seeder;
 use App\Models\SchemeAttachedDocMappings;
 use App\Models\Codemaster;
 
-class SapportingDocumentSeeder extends Seeder
+class SupportingDocumentSeeder extends Seeder
 {
     /**
      * Run the database seeds.

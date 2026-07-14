@@ -2,7 +2,7 @@
 
 namespace Database\Seeders\AssignPermission;
 
-use App\Models\Role;
+use Spatie\Permission\Models\Role;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Permission;
 use App\Models\User;

@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('address')->nullable();
             $table->string('zip')->nullable();;
             $table->timestamps();
-            $table->smallInteger('office_type_id');
+            $table->string('office_type_id');
             $table->smallInteger('state_id');
             $table->smallInteger('district_id')->nullable();
             $table->smallInteger('block_id')->nullable();

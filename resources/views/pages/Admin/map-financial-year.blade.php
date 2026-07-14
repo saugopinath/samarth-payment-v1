@@ -44,8 +44,13 @@ middleware(['auth', 'verified']);
                     $this->financial_year = array_key_last($years);
                 }
 
-                $mappedAmounts = \App\Models\SchemePaymentAmount::where('financial_year', $this->financial_year)->get();
-                $monthLots = \App\Models\FinancialYearMonthLot::where('financial_year', $this->financial_year)->get();
+                if (!empty($this->financial_year)) {
+                    $mappedAmounts = \App\Models\SchemePaymentAmount::where('financial_year', $this->financial_year)->get();
+                    $monthLots = \App\Models\FinancialYearMonthLot::where('financial_year', $this->financial_year)->get();
+                } else {
+                    $mappedAmounts = collect();
+                    $monthLots = collect();
+                }
                 $targetPaymentModes = Codemaster::where('parent_short_code', 'payment_mode')->where('is_active', true)->pluck('name', 'code')->toArray();
 
                 return [

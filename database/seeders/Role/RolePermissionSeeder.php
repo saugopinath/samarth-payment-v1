@@ -2,8 +2,8 @@
 
 namespace Database\Seeders\Role;
 
-use App\Models\Permission;
-use App\Models\Role;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\PermissionRegistrar;
@@ -27,51 +27,22 @@ class RolePermissionSeeder extends Seeder
         $roles = [
             'Super Admin',
             'HOD',
+            'DDO',
+            'Delegated DDO',
+            'Mis User',
             'Delegated HOD',
             'Approver',
             'Delegated Approver',
             'Verifier',
             'Delegated Verifier',
-            'Operator',
-            'Delegated Operator',
-            'DDO',
-            'Delegated DDO',
-            'Mis User State',
-            'Mis User District',
-            'Mis User Block',
-            'Mis User GP',
-            'Mis User Sub Division',
-            'Mis User Municipality',
-            'Mis User Ward',
+            'Operator'
         ];
         $can_roles_manages = [
-            'Super Admin' => ['HOD', 'Delegated HOD', 'Approver', 'Delegated Approver', 'Checker', 'Delegated Checker', 'Maker', 'Delegated Maker',
-                'DDO', 'Delegated DDO', 'Mis User State', 'Mis User District', 'Mis User Block', 'Mis User GP',
-                'Mis User Sub Division', 'Mis User Municipality', 'Mis User Ward'],
-
-            'HOD' => ['Delegated HOD', 'Approver', 'Delegated Approver', 'Checker', 'Delegated Checker', 'Maker', 'Delegated Maker',
-                'DDO', 'Delegated DDO', 'Mis User State', 'Mis User District', 'Mis User Block', 'Mis User GP',
-                'Mis User Sub Division', 'Mis User Municipality', 'Mis User Ward'],
-            'Delegated HOD' => '',
-            'Approver' => ['Delegated Approver', 'Checker', 'Delegated Checker', 'Maker', 'Delegated Maker',
-                'DDO', 'Delegated DDO', 'Mis User District', 'Mis User Block', 'Mis User GP',
-                'Mis User Sub Division', 'Mis User Municipality', 'Mis User Ward'],
-            'Delegated Approver' => '',
-            'Checker' => ['Delegated Checker', 'Maker', 'Delegated Maker',
-                'DDO', 'Delegated DDO', 'Mis User Block', 'Mis User GP',
-                'Mis User Sub Division', 'Mis User Municipality', 'Mis User Ward'],
-            'Delegated Checker' => '',
-            'Maker' => '',
-            'Delegated Maker' => '',
+            'Super Admin' => ['HOD','DDO','Delegated DDO','Mis User'],
+            'HOD' =>'',
             'DDO' => '',
             'Delegated DDO' => '',
-            'Mis User State' => '',
-            'Mis User District' => '',
-            'Mis User Block' => '',
-            'Mis User GP' => '',
-            'Mis User Sub Division' => '',
-            'Mis User Municipality' => '',
-            'Mis User Ward' => '',
+            'Mis User' => ''
         ];
 
         $permissions = [
@@ -81,133 +52,20 @@ class RolePermissionSeeder extends Seeder
             'ack validation lot',
             'get validation lot response',
             'import validation lot response',
-            // Payment  Lot SBI
-            'create payment lot SBI',
-            'sign payment lot SBI',
-            'push payment lot SBI',
-            'ack payment lot SBI',
-            'get payment lot response SBI',
-            'import payment lot response SBI',
-
-            // Payment  Lot IFMS
-            'create payment lot IFMS',
-            'push payment lot IFMS',
-            'ack payment lot IFMS',
-            'submit to tresury IFMS',
-            'sent to rbi IFMS',
-            'get payment lot response IFMS',
-
-            // User Model
-            'create user',
-            'read user',
-            'update user',
-            'delete user',
-
-            // Role
-            'create role',
-            'read role',
-            'update role',
-            'delete role',
-            // Permission
-            'create permission',
-            'read permission',
-            'update permission',
-            'delete permission',
-            // Role Permission
-            'create role permission',
-            'read role permission',
-            'update role permission',
-            'delete role permission',
-            // User Role
-            'create user role',
-            'read user role',
-            'update user role',
-            'delete user role',
-            // User Permission
-            'create user permission',
-            'read user permission',
-            'update user permission',
-            'delete user permission',
-            // State
-            'create state',
-            'read state',
-            'update state',
-            'delete state',
-            // District
-            'create district',
-            'read district',
-            'update district',
-            'delete district',
-            // Block
-            'create block',
-            'read block',
-            'update block',
-            'delete block',
-            // Gp
-            'create gp',
-            'read gp',
-            'update gp',
-            'delete gp',
-            // Municipality
-            'create municipality',
-            'read municipality',
-            'update municipality',
-            'delete municipality',
-            // Ward
-            'create ward',
-            'read ward',
-            'update ward',
-            'delete ward',
-            // Workflow
-            'application list',
-            'application view',
-            'application entry',
-            'application verify',
-            'application approve',
-            'application revert',
-            'application reject',
-            'application bulk approval',
-            'application recommanded',
-            'application recommanded bulk',
-            'application entryverifyapproval',
-            // Add your new permissions here
-            'update bank',
-            'search bank update',
-            'update mobile',
-            'view beneficiary details',
-            'update bank details',
-            'submit lb form',
-            'view draft list',
-            'edit draft',
-            'view lb applications',
-            'view application',
-            'view beneficiaries',
-            'revert incomplete',
-            'manage role mappings',
-            'create users',
-            'create role mappings',
-            'view offices',
-            'view reports',
-            'update caste',
-            'edit caste',
-            'view approved ba wise',
-            'view approved list',
-            'modify caste',
-            'view caste modification list',
-            'view incomplete applications',
-            'view users',
-            'update incomplete',
-            'view verifier incomplete',
-            'view approver incomplete',
-            'view permission',
-            'view user permission',
-            'create offices',
-            'update-mark-beneficiary-details',
-            'update-beneficiary-list',
-            'request-update-beneficiary',
-            'process application',
-            'verify application',
+            'defunc validation lot',
+            // Payment  Lot 
+            'create payment lot',
+            'sign payment lot',
+            'push payment lot',
+            'ack payment lot',
+            'get payment lot response',
+            'import payment lot response',
+            'defunc payment lot',
             'view-mis-report',
+             // Configuration
+            'configure-block-unblock-payment',
+            'configure-financial-year',
+            'configure-payment-lot-generation'
 
         ];
         $rolesArr = collect($roles)->map(function ($role) {
@@ -232,168 +90,68 @@ class RolePermissionSeeder extends Seeder
 
         $role_permission_map = [
             'Super Admin' => [
-                // User Model
-                'create user',
-                'read user',
-                // Role
-                'create role',
-                'read role',
-                'update role',
-                'delete role',
-                // Permission
-                'create permission',
-                'read permission',
-                'update permission',
-                'delete permission',
-                // Role Permission
-                'create role permission',
-                'read role permission',
-                'update role permission',
-                'delete role permission',
+            // Validation Lot
+            'defunc validation lot',
+           
+            // Payment  Lot 
+            'defunc payment lot',
+           
+             // Configuration
+            'configure-block-unblock-payment',
+            'configure-financial-year',
+            'configure-payment-lot-generation'
             ],
-            'HOD' => [
-                // Workflow
-                'application list',
-                'application view',
-                'application recommanded',
-                'application recommanded bulk',
-            ],
-            'Delegated HOD' => [
-                // Workflow
-                'application list',
-                'application view',
-                'application recommanded',
-                'application recommanded bulk',
-            ],
-            'Approver' => [
-                // District
-                'read district',
-                // Block
-                'read block',
-                // Municipality
-                'read municipality',
-                // Workflow
-                'application list',
-                'application view',
-                'application approve',
-                'application revert',
-                'application reject',
-                'application bulk approval',
-            ],
-            'Delegated Approver' => [
-                // District
-                'read district',
-                // Block
-                'read block',
-                // Municipality
-                'read municipality',
-                // Workflow
-                'application list',
-                'application view',
-                'application approve',
-                'application revert',
-                'application reject',
-                'application bulk approval',
-            ],
-            'Verifier' => [
-                // District
-                'read district',
-                // Block
-                'read block',
-                // Municipality
-                'read municipality',
-                // Workflow
-                'application list',
-                'application view',
-                'application verify',
-                'application revert',
-                'application reject',
-            ],
-            'Delegated Verifier' => [
-                // District
-                'read district',
-                // Block
-                'read block',
-                // Municipality
-                'read municipality',
-                // Workflow
-                'application list',
-                'application view',
-                'application verify',
-                'application revert',
-                'application reject',
-            ],
-            'Operator' => [
-                // District
-                'read district',
-                // Block
-                'read block',
-                // Municipality
-                'read municipality',
-                // Workflow
-                'application view',
-                'application list',
-                'application entry',
-            ],
-            'Delegated Operator' => [
-                // District
-                'read district',
-                // Block
-                'read block',
-                // Municipality
-                'read municipality',
-                // Workflow
-                'application view',
-                'application list',
-                'application entry',
-
-            ],
-            'DDO' => [
+             'DDO' => [
                 // Validation Lot
-                'create validation lot',
-                'push validation lot',
-                'ack validation lot',
-                'get validation lot response',
-                'import validation lot response',
-                // Payment  Lot SBI
-                'create payment lot SBI',
-                'sign payment lot SBI',
-                'push payment lot SBI',
-                'ack payment lot SBI',
-                'get payment lot response SBI',
-                'import payment lot response SBI',
-
-                // Payment  Lot IFMS
-                'create payment lot IFMS',
-                'push payment lot IFMS',
-                'ack payment lot IFMS',
-                'submit to tresury IFMS',
-                'sent to rbi IFMS',
-                'get payment lot response IFMS',
+            'create validation lot',
+            'push validation lot',
+            'ack validation lot',
+            'get validation lot response',
+            'import validation lot response',
+            'defunc validation lot',
+            // Payment  Lot 
+            'create payment lot',
+            'sign payment lot',
+            'push payment lot',
+            'ack payment lot',
+            'get payment lot response',
+            'import payment lot response',
+            'defunc payment lot',
+            'view-mis-report',
+             // Configuration
+            'configure-block-unblock-payment',
+            'configure-financial-year',
+            'configure-payment-lot-generation'
             ],
+           
             'Delegated DDO' => [
                 // Validation Lot
-                'create validation lot',
-                'push validation lot',
-                'ack validation lot',
-                'get validation lot response',
-                'import validation lot response',
-                // Payment  Lot SBI
-                'create payment lot SBI',
-                'sign payment lot SBI',
-                'push payment lot SBI',
-                'ack payment lot SBI',
-                'get payment lot response SBI',
-                'import payment lot response SBI',
-
-                // Payment  Lot IFMS
-                'create payment lot IFMS',
-                'push payment lot IFMS',
-                'ack payment lot IFMS',
-                'submit to tresury IFMS',
-                'sent to rbi IFMS',
-                'get payment lot response IFMS',
+            'create validation lot',
+            'push validation lot',
+            'ack validation lot',
+            'get validation lot response',
+            'import validation lot response',
+            'defunc validation lot',
+            // Payment  Lot 
+            'create payment lot',
+            'sign payment lot',
+            'push payment lot',
+            'ack payment lot',
+            'get payment lot response',
+            'import payment lot response',
+            'defunc payment lot',
+            'view-mis-report',
+             // Configuration
+            'configure-block-unblock-payment',
+            'configure-financial-year',
+            'configure-payment-lot-generation'
             ],
+            'Mis User' => [
+                // Validation Lot
+            'view-mis-report'
+           
+            ],
+           
         ];
 
         foreach ($role_permission_map as $role_name => $permissions) {

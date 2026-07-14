@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\Role;
+use Spatie\Permission\Models\Role;
 use App\Models\User;
 use App\Models\UserPersonal;
 use Illuminate\Support\Facades\Hash;
@@ -28,7 +28,7 @@ class OldSuperAdminSeeder extends Seeder
             'name' => $user->name,
         ]);
         $role = Role::findByName('Super Admin');
-        $user->assignRole($role);
+//        $user->assignRole($role);
         $user->givePermissionTo($role->permissions);
     }
 }

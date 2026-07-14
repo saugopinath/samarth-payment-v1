@@ -27,7 +27,13 @@ return new class extends Migration
     public function up(): void
     {
         DB::statement('CREATE SCHEMA IF NOT EXISTS payment');
-
+        $finyears = ['2020-2021','2022-2023','2023-2024','2024-2025','2025-2026','2026-2027','2027-2028','2028-2029','2029-2030','2030-2031','2031-2032','2032-2033'];
+        foreach ($finyears as $fin_year_item) {
+            $fy_suffix = str_replace('-', '_', $fin_year_item);
+            DB::statement("DROP TABLE IF EXISTS payment.bplm_fy_{$fy_suffix} CASCADE");
+        }
+        DB::statement('DROP TABLE IF EXISTS payment.bplm_default CASCADE');
+        DB::statement('DROP TABLE IF EXISTS payment.payment_lot_master CASCADE');
         DB::statement("
             CREATE TABLE IF NOT EXISTS payment.payment_lot_master
             (
@@ -138,6 +144,7 @@ return new class extends Migration
             $fy_suffix = str_replace('-', '_', $fin_year_item);
             DB::statement("DROP TABLE IF EXISTS payment.bplm_fy_{$fy_suffix} CASCADE");
         }
+        DB::statement('DROP TABLE IF EXISTS payment.bplm_default CASCADE');
         DB::statement('DROP TABLE IF EXISTS payment.payment_lot_master CASCADE');
     }
 };

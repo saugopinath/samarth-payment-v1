@@ -19,6 +19,12 @@ return new class extends Migration
     public function up(): void
     {
         DB::statement('CREATE SCHEMA IF NOT EXISTS payment');
+        $schemeIds = [1,2,3,5,6,7,8,9,10,11,13,17,19,20,21];
+        foreach ($schemeIds as $schemeItem) {
+            DB::statement("DROP TABLE IF EXISTS payment.vlm_s{$schemeItem} CASCADE");
+        }
+        DB::statement('DROP TABLE IF EXISTS payment.vlm_default CASCADE');
+        DB::statement('DROP TABLE IF EXISTS payment.validation_lot_master CASCADE');
 
         DB::statement("
             CREATE TABLE IF NOT EXISTS payment.validation_lot_master
@@ -84,6 +90,11 @@ return new class extends Migration
      */
     public function down(): void
     {
+        $schemeIds = [1,2,3,5,6,7,8,9,10,11,13,17,19,20,21];
+        foreach ($schemeIds as $schemeItem) {
+            DB::statement("DROP TABLE IF EXISTS payment.vlm_s{$schemeItem} CASCADE");
+        }
+        DB::statement('DROP TABLE IF EXISTS payment.vlm_default CASCADE');
         DB::statement('DROP TABLE IF EXISTS payment.validation_lot_master CASCADE');
     }
 };

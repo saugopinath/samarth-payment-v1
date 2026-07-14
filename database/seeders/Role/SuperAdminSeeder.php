@@ -3,7 +3,7 @@
 namespace Database\Seeders\Role;
 
 use App\Models\OfficeMaster;
-use App\Models\Role;
+use Spatie\Permission\Models\Role;
 use App\Models\Scheme;
 use App\Models\User;
 use App\Models\UserPersonal;
@@ -48,7 +48,7 @@ class SuperAdminSeeder extends Seeder
             );
 
         // $role = Role::findByName('Super Admin');
-        $user->assignRole($role);
+//        $user->assignRole($role);
         $user_office = UserRoleSchemeOfficeMapping::create([
             'user_id' => $user->id,
             'scheme_id' => $scheme->id,

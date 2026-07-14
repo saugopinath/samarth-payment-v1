@@ -34,7 +34,6 @@ return new class extends Migration
                 ifsc varchar(20) NULL,
                 amount_rs integer,
                 order_no_date bpchar(100) NULL,
-			    ref_no int8 NULL,
 			    status bpchar(10) NULL,
 			    reason varchar(150) NULL,
 			    utr_no bpchar(50) NULL,

@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('role_office_type_mappings', function (Blueprint $table) {
             $table->id();
-            $table->Integer('office_type_id');
+            $table->string('office_type_id');
             $table->Integer('role_id');
             $table->foreign('office_type_id','office_type_id_fk')->references('code')->on('codemasters')->onDelete('cascade'); 
             $table->foreign('role_id','role_id_fk')->references('id')->on('roles')->onDelete('cascade'); 

@@ -4,7 +4,7 @@ namespace Database\Seeders\OfficeMaster;
 
 use Illuminate\Database\Seeder;
 use App\Models\RoleOfficeTypeMapping;
-use App\Models\Role;
+use Spatie\Permission\Models\Role;
 use App\Models\Codemaster;
 class RoleOfficeTypeSeeder extends Seeder
 {

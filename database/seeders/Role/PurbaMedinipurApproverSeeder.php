@@ -2,7 +2,7 @@
 
 namespace Database\Seeders\Role;
 
-use App\Models\Role;
+use Spatie\Permission\Models\Role;
 use App\Models\User;
 use App\Models\UserPersonal;
 use Illuminate\Support\Facades\Hash;
@@ -40,7 +40,7 @@ class PurbaMedinipurApproverSeeder extends Seeder
             'user_id' => $user_approver->id,
             'name' => $user_approver->name,
         ]);
-        $user_approver->assignRole($role_approver);
+//        $user_approver->assignRole($role_approver);
         $user_office = UserRoleSchemeOfficeMapping::create([
             'user_id' =>  $user_approver->id,
             'scheme_id' => $scheme->id,
@@ -60,7 +60,7 @@ class PurbaMedinipurApproverSeeder extends Seeder
             'user_id' => $user_delegated_approver->id,
             'name' => $user_delegated_approver->name,
         ]);
-        $user_delegated_approver->assignRole($role_delegated_approver);
+//        $user_delegated_approver->assignRole($role_delegated_approver);
         $user_office = UserRoleSchemeOfficeMapping::create([
             'user_id' =>  $user_delegated_approver->id,
             'scheme_id' => $scheme->id,
