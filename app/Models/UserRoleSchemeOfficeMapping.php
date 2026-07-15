@@ -8,7 +8,8 @@ namespace App\Models;
 
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
-
+use OwenIt\Auditing\Contracts\Auditable;
+use OwenIt\Auditing\Auditable as AuditableTrait;
 /**
  * Class UserRoleSchemeOfficeMapping
  * 
@@ -28,8 +29,9 @@ use Illuminate\Database\Eloquent\Model;
  *
  * @package App\Models
  */
-class UserRoleSchemeOfficeMapping extends Model
+class UserRoleSchemeOfficeMapping extends Model implements Auditable
 {
+	use AuditableTrait;
 	protected $table = 'user_role_scheme_office_mappings';
 
 	protected $casts = [

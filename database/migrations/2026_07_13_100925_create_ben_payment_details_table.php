@@ -30,7 +30,6 @@ return new class extends Migration
                 last_ifsc character varying(11) COLLATE pg_catalog."default",
                 npci_bank_code character(4) COLLATE pg_catalog."default",
                 aadhar_no character(12) COLLATE pg_catalog."default",
-                ben_status integer NOT NULL,
                 last_acc_validated integer DEFAULT 0,
                 last_acc_validated_reason jsonb,
                 last_aadhar_validated integer DEFAULT 0,
@@ -60,6 +59,15 @@ return new class extends Migration
                 CONSTRAINT ben_payment_details_pkey PRIMARY KEY (ben_id, scheme_id)
             ) PARTITION BY LIST (scheme_id);
         ');
+
+        $schemeIds = [1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 13, 17, 19, 20, 21];
+        foreach ($schemeIds as $schemeItem) {
+            DB::statement("
+                CREATE TABLE IF NOT EXISTS payment.ben_payment_details_{$schemeItem}
+                PARTITION OF payment.ben_payment_details
+                FOR VALUES IN ({$schemeItem});
+            ");
+        }
     }
 
     /**

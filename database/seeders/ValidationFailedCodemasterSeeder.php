@@ -50,6 +50,12 @@ class ValidationFailedCodemasterSeeder extends Seeder
                 "parent_short_code" => "validation_failed",
                  "code" => "182",
             ),
+             array(
+                "name" => "DBT Validation Failed",
+                "short_name" => "dbt_validation_failed",
+                "parent_short_code" => "validation_failed",
+                 "code" => "183",
+            ),
             array(
                 "name" => "MAJOR MISMATCH",
                 "short_name" => "major_mismatch",

@@ -27,9 +27,13 @@ return new class extends Migration
 
         DB::statement("CREATE TABLE IF NOT EXISTS payment.ben_payment_abps_details
 (
+    id serial,
     ben_id integer NOT NULL,
     scheme_id smallint NOT NULL,
     aadhar_no character(12) NOT NULL,
+    created_at timestamp(0) without time zone,
+    updated_at timestamp(0) without time zone,
+    deleted_at timestamp(0) without time zone,
     is_clean smallint NOT NULL DEFAULT 1,
     CONSTRAINT ben_payment_abps_details_pkey PRIMARY KEY (ben_id, scheme_id, is_clean)
 ) PARTITION BY LIST (scheme_id);");

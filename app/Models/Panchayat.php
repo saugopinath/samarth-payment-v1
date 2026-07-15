@@ -9,7 +9,8 @@ namespace App\Models;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
-
+use OwenIt\Auditing\Contracts\Auditable;
+use OwenIt\Auditing\Auditable as AuditableTrait;
 /**
  * Class Panchayat
  * 
@@ -27,8 +28,9 @@ use Illuminate\Database\Eloquent\Model;
  *
  * @package App\Models
  */
-class Panchayat extends Model
+class Panchayat extends Model implements Auditable
 {
+	 use AuditableTrait;
 	protected $table = 'panchayats';
 
 	protected $casts = [
@@ -53,4 +55,9 @@ class Panchayat extends Model
 	{
 		return $this->hasMany(OfficeMaster::class);
 	}
+
+    public function lotControl()
+    {
+        return $this->morphOne(\App\Models\LotControl::class, 'blockable');
+    }
 }

@@ -8,7 +8,8 @@ namespace App\Models;
 
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
-
+use OwenIt\Auditing\Contracts\Auditable;
+use OwenIt\Auditing\Auditable as AuditableTrait;
 /**
  * Class ChangeTypeMaster
  * 
@@ -22,8 +23,9 @@ use Illuminate\Database\Eloquent\Model;
  *
  * @package App\Models
  */
-class ChangeTypeMaster extends Model
+class ChangeTypeMaster extends Model implements Auditable
 {
+	 use AuditableTrait;
 	protected $table = 'change_type_masters';
 
 	protected $casts = [

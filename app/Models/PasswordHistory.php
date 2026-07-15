@@ -8,7 +8,8 @@ namespace App\Models;
 
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
-
+use OwenIt\Auditing\Contracts\Auditable;
+use OwenIt\Auditing\Auditable as AuditableTrait;
 /**
  * Class PasswordHistory
  * 
@@ -22,8 +23,9 @@ use Illuminate\Database\Eloquent\Model;
  *
  * @package App\Models
  */
-class PasswordHistory extends Model
+class PasswordHistory extends Model implements Auditable
 {
+	 use AuditableTrait;
 	protected $table = 'password_histories';
 
 	protected $casts = [

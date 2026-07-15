@@ -9,7 +9,8 @@ namespace App\Models;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
-
+use OwenIt\Auditing\Contracts\Auditable;
+use OwenIt\Auditing\Auditable as AuditableTrait;
 /**
  * Class Scheme
  * 
@@ -38,8 +39,9 @@ use Illuminate\Database\Eloquent\Model;
  *
  * @package App\Models
  */
-class Scheme extends Model
+class Scheme extends Model implements Auditable
 {
+	 use AuditableTrait;
 	protected $table = 'schemes';
 
 	protected $casts = [
@@ -95,4 +97,9 @@ class Scheme extends Model
 					->withPivot('id', 'user_id', 'office_id', 'is_active')
 					->withTimestamps();
 	}
+
+    public function lotControl()
+    {
+        return $this->morphOne(\App\Models\LotControl::class, 'blockable');
+    }
 }

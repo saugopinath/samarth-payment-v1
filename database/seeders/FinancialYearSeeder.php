@@ -15,10 +15,10 @@ class FinancialYearSeeder extends Seeder
     {
         $now = Carbon::now();
         FinancialYear::insert([
-            ['name' => '2023-2024', 'code' => '2324', 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
-            ['name' => '2024-2025', 'code' => '2425', 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
-            ['name' => '2025-2026', 'code' => '2526', 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
-            ['name' => '2026-2027', 'code' => '2627', 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
+            ['name' => '2023-2024', 'code' => '2023-2024', 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
+            ['name' => '2024-2025', 'code' => '2024-2025', 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
+            ['name' => '2025-2026', 'code' => '2025-2026', 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
+            ['name' => '2026-2027', 'code' => '2026-2027', 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
         ]);
     }
 }

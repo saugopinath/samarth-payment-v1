@@ -1,18 +1,17 @@
 <?php
-$ch = curl_init('http://samarth-v1.test/login');
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-curl_setopt($ch, CURLOPT_HEADER, true);
-curl_setopt($ch, CURLOPT_NOBODY, true);
-curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
-$response = curl_exec($ch);
-echo "LOGIN REDIRECTS TO:\n";
-echo $response;
 
-$ch2 = curl_init('http://samarth-v1.test/Admin/dashboard');
-curl_setopt($ch2, CURLOPT_RETURNTRANSFER, true);
-curl_setopt($ch2, CURLOPT_HEADER, true);
-curl_setopt($ch2, CURLOPT_NOBODY, true);
-curl_setopt($ch2, CURLOPT_FOLLOWLOCATION, false);
-$response2 = curl_exec($ch2);
-echo "\nDASHBOARD REDIRECTS TO:\n";
-echo $response2;
+$detail = [
+    'ben_id' => 12345678,
+    'scheme_id' => 1,
+    'ben_name' => 'Test',
+    'ben_status' => 1,
+    'created_by_dist_code' => 1,
+    'created_by_sdo_code' => 1,
+    'created_by_block_code' => 1,
+];
+$model = new App\Models\BenPaymentDetail();
+$model->fill($detail);
+DB::enableQueryLog();
+$res = $model->save();
+print_r($res);
+print_r(DB::getQueryLog());

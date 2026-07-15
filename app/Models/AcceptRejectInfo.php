@@ -8,6 +8,8 @@ namespace App\Models;
 
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
+use OwenIt\Auditing\Contracts\Auditable;
+use OwenIt\Auditing\Auditable as AuditableTrait;
 
 /**
  * Class AcceptRejectInfo
@@ -36,8 +38,9 @@ use Illuminate\Database\Eloquent\Model;
  *
  * @package App\Models
  */
-class AcceptRejectInfo extends Model
+class AcceptRejectInfo extends Model implements Auditable
 {
+	use AuditableTrait;
 	protected $table = 'accept_reject_infos';
 
 	protected $casts = [

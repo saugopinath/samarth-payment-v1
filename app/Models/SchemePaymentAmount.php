@@ -8,7 +8,8 @@ namespace App\Models;
 
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
-
+use OwenIt\Auditing\Contracts\Auditable;
+use OwenIt\Auditing\Auditable as AuditableTrait;
 /**
  * Class SchemePaymentAmount
  * 
@@ -46,8 +47,9 @@ use Illuminate\Database\Eloquent\Model;
  *
  * @package App\Models
  */
-class SchemePaymentAmount extends Model
+class SchemePaymentAmount extends Model implements Auditable
 {
+	 use AuditableTrait;
 	protected $table = 'scheme_payment_amounts';
 
 	protected $casts = [

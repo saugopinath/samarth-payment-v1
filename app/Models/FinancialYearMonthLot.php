@@ -8,7 +8,8 @@ namespace App\Models;
 
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
-
+use OwenIt\Auditing\Contracts\Auditable;
+use OwenIt\Auditing\Auditable as AuditableTrait;
 /**
  * Class FinancialYearMonthLot
  * 
@@ -23,8 +24,9 @@ use Illuminate\Database\Eloquent\Model;
  *
  * @package App\Models
  */
-class FinancialYearMonthLot extends Model
+class FinancialYearMonthLot extends Model implements Auditable
 {
+	 use AuditableTrait;
 	protected $table = 'financial_year_month_lots';
 
 	protected $casts = [

@@ -9,6 +9,8 @@ namespace App\Models;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use OwenIt\Auditing\Contracts\Auditable;
+use OwenIt\Auditing\Auditable as AuditableTrait;
 
 /**
  * Class Bankmaster
@@ -25,8 +27,9 @@ use Illuminate\Database\Eloquent\Model;
  *
  * @package App\Models
  */
-class Bankmaster extends Model
+class Bankmaster extends Model implements Auditable
 {
+	 use AuditableTrait;
 	protected $table = 'bankmasters';
 
 	protected $casts = [

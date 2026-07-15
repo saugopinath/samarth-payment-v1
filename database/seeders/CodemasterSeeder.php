@@ -108,6 +108,16 @@ class CodemasterSeeder extends Seeder
                 "short_name" => "payment_mode",
                 "code" => "520",
             ),
+             array(
+                "name" => "Payment Lot Status",
+                "short_name" => "payment_lot_status",
+                "code" => "521",
+            ),
+             array(
+                "name" => "Validation Lot Status",
+                "short_name" => "validation_lot_status",
+                "code" => "522",
+            ),
         );
         foreach ($codemasterParents as $codemasterParent_item) {
             Codemaster::create([
@@ -826,6 +836,12 @@ class CodemasterSeeder extends Seeder
                 "parent_short_code" => "ENCDETAILS",
                  "code" => "1632",
             ),
+            array(
+                "name" => "Supporting Document for Payment Enable or Disable ",
+                "short_name" => "payment_enable_disable_enc",
+                "parent_short_code" => "ENCDETAILS",
+                 "code" => "1633",
+            ),
              array(
                 "name" => "Account Base",
                 "short_name" => "acc_base",
@@ -873,6 +889,66 @@ class CodemasterSeeder extends Seeder
                 "short_name" => "Bandhan",
                 "parent_short_code" => "payment_mode",
                  "code" => "5204",
+            ),
+            array(
+                "name" => "Sir Mark",
+                "short_name" => "not_eligible_cause_sir",
+                "parent_short_code" => "not_eligible_cause",
+                "code" => "5205",
+            ),
+             array(
+                "name" => "Others",
+                "short_name" => "not_eligible_cause_oth",
+                "parent_short_code" => "not_eligible_cause",
+                 "code" => "5206",
+            ),
+            array(
+                "name" => "Not Generated",
+                "short_name" => "payment_lot_status_not_generated",
+                "parent_short_code" => "payment_lot_status",
+                 "code" => "52101",
+            ),
+             array(
+                "name" => "Generated but yet not Pushed",
+                "short_name" => "payment_lot_status_generated",
+                "parent_short_code" => "payment_lot_status",
+                 "code" => "52102",
+            ),
+            array(
+                "name" => "Generated and Pushed but Response Pending",
+                "short_name" => "payment_lot_status_generated_and_pushed",
+                "parent_short_code" => "payment_lot_status",
+                 "code" => "52103",
+            ),
+             array(
+                "name" => "Generated,Pushed and Response Received",
+                "short_name" => "payment_lot_status_generated_pushed_response_received",
+                "parent_short_code" => "payment_lot_status",
+                 "code" => "52104",
+            ),
+             array(
+                "name" => "Not Generated",
+                "short_name" => "validation_lot_status_not_generated",
+                "parent_short_code" => "validation_lot_status",
+                 "code" => "52201",
+            ),
+             array(
+                "name" => "Generated but yet not Pushed",
+                "short_name" => "validation_lot_status_generated",
+                "parent_short_code" => "validation_lot_status",
+                 "code" => "52202",
+            ),
+            array(
+                "name" => "Generated and Pushed but Response Pending",
+                "short_name" => "validation_lot_status_generated_and_pushed",
+                "parent_short_code" => "validation_lot_status",
+                 "code" => "52203",
+            ),
+             array(
+                "name" => "Generated,Pushed and Response Received",
+                "short_name" => "validation_lot_status_generated_pushed_response_received",
+                "parent_short_code" => "validation_lot_status",
+                 "code" => "52204",
             ),
         );
         foreach ($codemasterChilds as $codemasterChild_item) {

@@ -7,7 +7,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-
+use OwenIt\Auditing\Contracts\Auditable;
+use OwenIt\Auditing\Auditable as AuditableTrait;
 /**
  * Class RoleHasPermission
  * 
@@ -19,8 +20,9 @@ use Illuminate\Database\Eloquent\Model;
  *
  * @package App\Models
  */
-class RoleHasPermission extends Model
+class RoleHasPermission extends Model implements Auditable
 {
+	 use AuditableTrait;
 	protected $table = 'role_has_permissions';
 	public $incrementing = false;
 	public $timestamps = false;

@@ -9,7 +9,8 @@ namespace App\Models;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
-
+use OwenIt\Auditing\Contracts\Auditable;
+use OwenIt\Auditing\Auditable as AuditableTrait;
 /**
  * Class Municipality
  * 
@@ -29,8 +30,9 @@ use Illuminate\Database\Eloquent\Model;
  *
  * @package App\Models
  */
-class Municipality extends Model
+class Municipality extends Model implements Auditable
 {
+	 use AuditableTrait;
 	protected $table = 'municipalities';
 
 	protected $casts = [
@@ -61,4 +63,9 @@ class Municipality extends Model
 	{
 		return $this->hasMany(OfficeMaster::class, 'municipalitiy_id');
 	}
+
+    public function lotControl()
+    {
+        return $this->morphOne(\App\Models\LotControl::class, 'blockable');
+    }
 }
