@@ -279,18 +279,40 @@ middleware(['auth', 'verified']);
                     return;
                 }
 
-                if (!$this->supporting_document && $this->result_level !== 'beneficiary' && !empty($this->pendingLotChanges)) {
-                    $this->addError('supporting_document', 'Supporting document is required to save changes.');
-                    return;
+                $codemasterDoc = \App\Models\Codemaster::where('code', '1633')->first();
+                $docTypeCode = $codemasterDoc ? $codemasterDoc->code : 1633;
+                $docTypeName = $codemasterDoc ? $codemasterDoc->name : 'Supporting Document for Payment Enable or Disable';
+
+                if ($this->result_level !== 'beneficiary' && !empty($this->pendingLotChanges)) {
+                    $docMaster = \App\Models\DocumentTypeMaster::where('document_type_code', $docTypeCode)->first();
+                    $rules = ['required', 'file'];
+                    
+                    if ($docMaster) {
+                        if (!empty($docMaster->document_extension) && is_array($docMaster->document_extension)) {
+                            $rules[] = 'mimes:' . implode(',', $docMaster->document_extension);
+                        }
+                        if (!empty($docMaster->document_mime_type) && is_array($docMaster->document_mime_type)) {
+                            $rules[] = 'mimetypes:' . implode(',', $docMaster->document_mime_type);
+                        }
+                        if (!empty($docMaster->max_size)) {
+                            $rules[] = 'max:' . $docMaster->max_size;
+                        }
+                    }
+
+                    $this->validate([
+                        'supporting_document' => $rules,
+                    ], [
+                        'supporting_document.required' => 'Supporting document is required to save changes.',
+                        'supporting_document.mimes' => 'The document must be a file of type: ' . (isset($docMaster) && is_array($docMaster->document_extension) ? implode(', ', $docMaster->document_extension) : '') . '.',
+                        'supporting_document.mimetypes' => 'The document MIME type is invalid.',
+                        'supporting_document.max' => 'The document size must not exceed ' . (isset($docMaster) ? $docMaster->max_size : '') . ' KB.',
+                    ]);
                 }
                 
                 $path = null;
                 $fileContentBase64 = null;
                 $fileExtension = null;
                 $fileMimeType = null;
-                $codemasterDoc = \App\Models\Codemaster::where('code', '1633')->first();
-                $docTypeCode = $codemasterDoc ? $codemasterDoc->code : 1633;
-                $docTypeName = $codemasterDoc ? $codemasterDoc->name : 'Supporting Document for Payment Enable or Disable';
 
                 if ($this->supporting_document && !empty($this->pendingLotChanges)) {
                     $fileContentBase64 = base64_encode(file_get_contents($this->supporting_document->getRealPath()));
