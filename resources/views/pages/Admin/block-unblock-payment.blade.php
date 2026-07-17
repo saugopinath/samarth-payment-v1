@@ -46,34 +46,50 @@ middleware(['auth', 'verified']);
                 'selectedCauses' => [],
                 'causeErrors' => [],
                 'supporting_document' => null,
+                'pendingLotChanges' => [],
+                'pendingBenChanges' => [],
             ]);
 
             updated([
                 'scheme_id' => function () {
                     $this->show_results = false;
+                    $this->pendingLotChanges = [];
+                    $this->pendingBenChanges = [];
                 },
                 'district_id' => function () {
                     $this->area_type = '';
                     $this->subdivision_id = '';
                     $this->block_id = '';
                     $this->show_results = false;
+                    $this->pendingLotChanges = [];
+                    $this->pendingBenChanges = [];
                 },
                 'area_type' => function () {
                     $this->subdivision_id = '';
                     $this->block_id = '';
                     $this->show_results = false;
+                    $this->pendingLotChanges = [];
+                    $this->pendingBenChanges = [];
                 },
                 'subdivision_id' => function () {
                     $this->show_results = false;
+                    $this->pendingLotChanges = [];
+                    $this->pendingBenChanges = [];
                 },
                 'block_id' => function () {
                     $this->show_results = false;
+                    $this->pendingLotChanges = [];
+                    $this->pendingBenChanges = [];
                 },
                 'beneficiary_id' => function () {
                     $this->show_results = false;
+                    $this->pendingLotChanges = [];
+                    $this->pendingBenChanges = [];
                 },
                 'active_tab' => function () {
                     $this->show_results = false;
+                    $this->pendingLotChanges = [];
+                    $this->pendingBenChanges = [];
                 }
             ]);
 
@@ -216,117 +232,163 @@ middleware(['auth', 'verified']);
                 }
 
                 $this->show_results = true;
+                $this->pendingLotChanges = [];
+                $this->pendingBenChanges = [];
             };
 
-            $toggleSchemeLot = function ($schemeId, $type) {
-                if (!$this->supporting_document) return;
-                
-                $scheme = Scheme::find($schemeId);
-                if (!$scheme) return;
-                
-                $lotControl = $scheme->lotControl()->first() ?? new \App\Models\LotControl(['allow_regular_lot' => true, 'allow_arrear_lot' => true]);
-                
-                if ($type === 'regular') {
-                    $lotControl->allow_regular_lot = !$lotControl->allow_regular_lot;
-                } elseif ($type === 'arrear') {
-                    $lotControl->allow_arrear_lot = !$lotControl->allow_arrear_lot;
-                }
-                
-                $path = $this->supporting_document->store('supporting_documents', 'public');
-                $lotControl->supporting_document = $path;
-                
-                $isBlocking = ($type === 'regular' && !$lotControl->allow_regular_lot) || ($type === 'arrear' && !$lotControl->allow_arrear_lot);
-                if ($isBlocking) {
-                    $lotControl->last_block_by = auth()->id() ?? 1;
-                    $lotControl->last_block_at = now();
-                    $lotControl->last_block_ip = request()->ip();
+            $queueLotChange = function ($level, $id, $type) {
+                $key = "{$level}_{$id}_{$type}";
+                if (isset($this->pendingLotChanges[$key])) {
+                    unset($this->pendingLotChanges[$key]);
                 } else {
-                    $lotControl->last_unblock_by = auth()->id() ?? 1;
-                    $lotControl->last_unblock_at = now();
-                    $lotControl->last_unblock_ip = request()->ip();
+                    $this->pendingLotChanges[$key] = true;
                 }
-                
-                $scheme->lotControl()->save($lotControl);
             };
 
-            $toggleAreaLot = function ($level, $id, $type) {
-                if (!$this->supporting_document) return;
-                
-                $modelClass = match($level) {
-                    'district' => District::class,
-                    'subdivision' => Subdivision::class,
-                    'block' => Block::class,
-                    'municipality' => Municipality::class,
-                    'panchayat' => Panchayat::class,
-                    default => null
-                };
-                
-                if (!$modelClass) return;
-                
-                $model = $modelClass::find($id);
-                if (!$model) return;
-                
-                $lotControl = $model->lotControl()->first() ?? new \App\Models\LotControl(['allow_regular_lot' => true, 'allow_arrear_lot' => true]);
-                
-                if ($type === 'regular') {
-                    $lotControl->allow_regular_lot = !$lotControl->allow_regular_lot;
-                } elseif ($type === 'arrear') {
-                    $lotControl->allow_arrear_lot = !$lotControl->allow_arrear_lot;
-                }
-                
-                $path = $this->supporting_document->store('supporting_documents', 'public');
-                $lotControl->supporting_document = $path;
-                
-                $isBlocking = ($type === 'regular' && !$lotControl->allow_regular_lot) || ($type === 'arrear' && !$lotControl->allow_arrear_lot);
-                if ($isBlocking) {
-                    $lotControl->last_block_by = auth()->id() ?? 1;
-                    $lotControl->last_block_at = now();
-                    $lotControl->last_block_ip = request()->ip();
-                } else {
-                    $lotControl->last_unblock_by = auth()->id() ?? 1;
-                    $lotControl->last_unblock_at = now();
-                    $lotControl->last_unblock_ip = request()->ip();
-                }
-                
-                $model->lotControl()->save($lotControl);
-                
-                $this->search();
-            };
-
-            $blockBeneficiary = function ($id) {
+            $queueBenChange = function ($id, $action) {
                 if (empty($this->scheme_id)) return;
                 
-                $cause = $this->selectedCauses[$id] ?? null;
-                if (empty($cause)) {
-                    $this->causeErrors[$id] = 'Select cause is mandatory to block.';
+                $ben = BenPaymentDetail::where('ben_id', $id)->where('scheme_id', $this->scheme_id)->first();
+                if (!$ben) return;
+                
+                $originalStatus = $ben->is_eligible ? 'unblock' : 'block';
+                
+                if ($action === 'block') {
+                    $cause = $this->selectedCauses[$id] ?? null;
+                    if (empty($cause)) {
+                        $this->causeErrors[$id] = 'Select cause is mandatory to block.';
+                        return;
+                    }
+                    unset($this->causeErrors[$id]);
+                } else {
+                    unset($this->causeErrors[$id]);
+                }
+                
+                if ($originalStatus === $action) {
+                    unset($this->pendingBenChanges[$id]);
+                } else {
+                    $this->pendingBenChanges[$id] = [
+                        'action' => $action,
+                        'cause' => $action === 'block' ? $cause : null
+                    ];
+                }
+            };
+
+            $submitChanges = function () {
+                if (empty($this->pendingLotChanges) && empty($this->pendingBenChanges)) {
                     return;
                 }
-                unset($this->causeErrors[$id]);
-                
-                BenPaymentDetail::where('ben_id', $id)
-                    ->where('scheme_id', $this->scheme_id)
-                    ->update([
-                        'is_eligible' => false,
-                        'non_eligible_reason' => $cause
-                    ]);
-                    
-                $this->search();
-            };
 
-            $unblockBeneficiary = function ($id) {
-                if (empty($this->scheme_id)) return;
+                if (!$this->supporting_document && $this->result_level !== 'beneficiary' && !empty($this->pendingLotChanges)) {
+                    $this->addError('supporting_document', 'Supporting document is required to save changes.');
+                    return;
+                }
                 
-                unset($this->causeErrors[$id]);
-                
-                BenPaymentDetail::where('ben_id', $id)
-                    ->where('scheme_id', $this->scheme_id)
-                    ->update([
-                        'is_eligible' => true,
-                        'non_eligible_reason' => null
-                    ]);
+                $path = null;
+                $fileContentBase64 = null;
+                $fileExtension = null;
+                $fileMimeType = null;
+                $codemasterDoc = \App\Models\Codemaster::where('code', '1633')->first();
+                $docTypeCode = $codemasterDoc ? $codemasterDoc->code : 1633;
+                $docTypeName = $codemasterDoc ? $codemasterDoc->name : 'Supporting Document for Payment Enable or Disable';
+
+                if ($this->supporting_document && !empty($this->pendingLotChanges)) {
+                    $fileContentBase64 = base64_encode(file_get_contents($this->supporting_document->getRealPath()));
+                    $fileExtension = $this->supporting_document->getClientOriginalExtension();
+                    $fileMimeType = $this->supporting_document->getMimeType();
                     
-                $this->selectedCauses[$id] = null;
+                    $path = $this->supporting_document->store('supporting_documents', 'public');
+                }
+
+                foreach ($this->pendingLotChanges as $key => $value) {
+                    [$level, $id, $type] = explode('_', $key);
+                    
+                    if ($level === 'scheme') {
+                        $model = Scheme::find($id);
+                    } else {
+                        $modelClass = match($level) {
+                            'district' => District::class,
+                            'subdivision' => Subdivision::class,
+                            'block' => Block::class,
+                            'municipality' => Municipality::class,
+                            'panchayat' => Panchayat::class,
+                            default => null
+                        };
+                        if (!$modelClass) continue;
+                        $model = $modelClass::find($id);
+                    }
+                    
+                    if (!$model) continue;
+                    
+                    $lotControl = $model->lotControl()->first() ?? new \App\Models\LotControl(['allow_regular_lot' => true, 'allow_arrear_lot' => true]);
+                    
+                    if ($type === 'regular') {
+                        $lotControl->allow_regular_lot = !$lotControl->allow_regular_lot;
+                    } elseif ($type === 'arrear') {
+                        $lotControl->allow_arrear_lot = !$lotControl->allow_arrear_lot;
+                    }
+                    
+                    if ($path) {
+                        $lotControl->supporting_document = $path;
+                        
+                        $schemeIdForDoc = ($level === 'scheme') ? $id : ($this->scheme_id ?: 0);
+                        $distCodeForDoc = !empty($this->district_id) ? $this->district_id : 303; // 303 is default partition
+
+                        \App\Models\BenAttachDocument::updateOrCreate(
+                            [
+                                'beneficiary_id' => $id,
+                                'document_type' => $docTypeCode,
+                                'created_by_dist_code' => $distCodeForDoc,
+                            ],
+                            [
+                                'scheme_id' => $schemeIdForDoc,
+                                'attched_document' => $fileContentBase64,
+                                'created_by' => auth()->id() ?? 1,
+                                'ip_address' => request()->ip(),
+                                'document_extension' => $fileExtension,
+                                'document_mime_type' => $fileMimeType,
+                                'doc_type_name' => $docTypeName,
+                            ]
+                        );
+                    }
+                    
+                    $isBlocking = ($type === 'regular' && !$lotControl->allow_regular_lot) || ($type === 'arrear' && !$lotControl->allow_arrear_lot);
+                    if ($isBlocking) {
+                        $lotControl->last_block_by = auth()->id() ?? 1;
+                        $lotControl->last_block_at = now();
+                        $lotControl->last_block_ip = request()->ip();
+                    } else {
+                        $lotControl->last_unblock_by = auth()->id() ?? 1;
+                        $lotControl->last_unblock_at = now();
+                        $lotControl->last_unblock_ip = request()->ip();
+                    }
+                    
+                    $model->lotControl()->save($lotControl);
+                }
+
+                foreach ($this->pendingBenChanges as $id => $change) {
+                    if ($change['action'] === 'block') {
+                        BenPaymentDetail::where('ben_id', $id)
+                            ->where('scheme_id', $this->scheme_id)
+                            ->update([
+                                'is_eligible' => false,
+                                'non_eligible_reason' => $change['cause']
+                            ]);
+                    } else {
+                        BenPaymentDetail::where('ben_id', $id)
+                            ->where('scheme_id', $this->scheme_id)
+                            ->update([
+                                'is_eligible' => true,
+                                'non_eligible_reason' => null
+                            ]);
+                    }
+                }
+
+                $this->pendingLotChanges = [];
+                $this->pendingBenChanges = [];
+                $this->supporting_document = null;
                 
+                session()->flash('success', 'Changes submitted successfully.');
                 $this->search();
             };
             
@@ -346,6 +408,16 @@ middleware(['auth', 'verified']);
         ?>
         <div class="w-full px-4 sm:px-6 lg:px-8 space-y-6">
             
+            <!-- Flash Message -->
+            @if(session('success'))
+                <div class="mb-4 p-4 bg-green-50 border-l-4 border-green-500 text-green-700 flex items-center justify-between">
+                    <div>
+                        <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                        {{ session('success') }}
+                    </div>
+                </div>
+            @endif
+
             <!-- Filter Criteria Panel -->
             <div class="bg-white/80 backdrop-blur-xl shadow-xl shadow-indigo-100/50 border border-indigo-50 rounded-2xl overflow-hidden transition-all duration-300">
                 <div class="px-8 py-5 border-b border-indigo-50/60 bg-gradient-to-r from-slate-50 to-indigo-50/30 flex justify-center sm:justify-start">
@@ -641,11 +713,11 @@ middleware(['auth', 'verified']);
                                             <td class="px-4 py-3 whitespace-nowrap">
                                                 <div class="flex items-center space-x-4">
                                                     <label class="flex items-center cursor-pointer">
-                                                        <input type="checkbox" wire:click="toggleSchemeLot({{ $sch->id }}, 'regular')" {{ ($sch->lotControl->allow_regular_lot ?? true) ? 'checked' : '' }} {{ $supporting_document ? '' : 'disabled' }} class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50">
+                                                        <input type="checkbox" wire:click="queueLotChange('scheme', {{ $sch->id }}, 'regular')" {{ (isset($pendingLotChanges["scheme_{$sch->id}_regular"]) ? !($sch->lotControl->allow_regular_lot ?? true) : ($sch->lotControl->allow_regular_lot ?? true)) ? 'checked' : '' }} {{ $supporting_document ? '' : 'disabled' }} class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50">
                                                         <span class="ml-2 text-sm text-gray-700 font-medium {{ $supporting_document ? '' : 'opacity-50' }}">Regular Lot</span>
                                                     </label>
                                                     <label class="flex items-center cursor-pointer">
-                                                        <input type="checkbox" wire:click="toggleSchemeLot({{ $sch->id }}, 'arrear')" {{ ($sch->lotControl->allow_arrear_lot ?? true) ? 'checked' : '' }} {{ $supporting_document ? '' : 'disabled' }} class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50">
+                                                        <input type="checkbox" wire:click="queueLotChange('scheme', {{ $sch->id }}, 'arrear')" {{ (isset($pendingLotChanges["scheme_{$sch->id}_arrear"]) ? !($sch->lotControl->allow_arrear_lot ?? true) : ($sch->lotControl->allow_arrear_lot ?? true)) ? 'checked' : '' }} {{ $supporting_document ? '' : 'disabled' }} class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50">
                                                         <span class="ml-2 text-sm text-gray-700 font-medium {{ $supporting_document ? '' : 'opacity-50' }}">Arrear Lot</span>
                                                     </label>
                                                 </div>
@@ -664,11 +736,11 @@ middleware(['auth', 'verified']);
                                             <td class="px-4 py-3 whitespace-nowrap">
                                                 <div class="flex items-center space-x-4">
                                                     <label class="flex items-center cursor-pointer">
-                                                        <input type="checkbox" wire:click="toggleAreaLot('district', {{ $row->id }}, 'regular')" {{ ($row->lotControl->allow_regular_lot ?? true) ? 'checked' : '' }} {{ $supporting_document ? '' : 'disabled' }} class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50">
+                                                        <input type="checkbox" wire:click="queueLotChange('district', {{ $row->id }}, 'regular')" {{ (isset($pendingLotChanges["district_{$row->id}_regular"]) ? !($row->lotControl->allow_regular_lot ?? true) : ($row->lotControl->allow_regular_lot ?? true)) ? 'checked' : '' }} {{ $supporting_document ? '' : 'disabled' }} class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50">
                                                         <span class="ml-2 text-sm text-gray-700 font-medium {{ $supporting_document ? '' : 'opacity-50' }}">Regular Lot</span>
                                                     </label>
                                                     <label class="flex items-center cursor-pointer">
-                                                        <input type="checkbox" wire:click="toggleAreaLot('district', {{ $row->id }}, 'arrear')" {{ ($row->lotControl->allow_arrear_lot ?? true) ? 'checked' : '' }} {{ $supporting_document ? '' : 'disabled' }} class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50">
+                                                        <input type="checkbox" wire:click="queueLotChange('district', {{ $row->id }}, 'arrear')" {{ (isset($pendingLotChanges["district_{$row->id}_arrear"]) ? !($row->lotControl->allow_arrear_lot ?? true) : ($row->lotControl->allow_arrear_lot ?? true)) ? 'checked' : '' }} {{ $supporting_document ? '' : 'disabled' }} class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50">
                                                         <span class="ml-2 text-sm text-gray-700 font-medium {{ $supporting_document ? '' : 'opacity-50' }}">Arrear Lot</span>
                                                     </label>
                                                 </div>
@@ -687,11 +759,11 @@ middleware(['auth', 'verified']);
                                             <td class="px-4 py-3 whitespace-nowrap">
                                                 <div class="flex items-center space-x-4">
                                                     <label class="flex items-center cursor-pointer">
-                                                        <input type="checkbox" wire:click="toggleAreaLot('subdivision', {{ $sub->id }}, 'regular')" {{ ($sub->lotControl->allow_regular_lot ?? true) ? 'checked' : '' }} {{ $supporting_document ? '' : 'disabled' }} class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50">
+                                                        <input type="checkbox" wire:click="queueLotChange('subdivision', {{ $sub->id }}, 'regular')" {{ (isset($pendingLotChanges["subdivision_{$sub->id}_regular"]) ? !($sub->lotControl->allow_regular_lot ?? true) : ($sub->lotControl->allow_regular_lot ?? true)) ? 'checked' : '' }} {{ $supporting_document ? '' : 'disabled' }} class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50">
                                                         <span class="ml-2 text-sm text-gray-700 font-medium {{ $supporting_document ? '' : 'opacity-50' }}">Regular Lot</span>
                                                     </label>
                                                     <label class="flex items-center cursor-pointer">
-                                                        <input type="checkbox" wire:click="toggleAreaLot('subdivision', {{ $sub->id }}, 'arrear')" {{ ($sub->lotControl->allow_arrear_lot ?? true) ? 'checked' : '' }} {{ $supporting_document ? '' : 'disabled' }} class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50">
+                                                        <input type="checkbox" wire:click="queueLotChange('subdivision', {{ $sub->id }}, 'arrear')" {{ (isset($pendingLotChanges["subdivision_{$sub->id}_arrear"]) ? !($sub->lotControl->allow_arrear_lot ?? true) : ($sub->lotControl->allow_arrear_lot ?? true)) ? 'checked' : '' }} {{ $supporting_document ? '' : 'disabled' }} class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50">
                                                         <span class="ml-2 text-sm text-gray-700 font-medium {{ $supporting_document ? '' : 'opacity-50' }}">Arrear Lot</span>
                                                     </label>
                                                 </div>
@@ -710,11 +782,11 @@ middleware(['auth', 'verified']);
                                             <td class="px-4 py-3 whitespace-nowrap">
                                                 <div class="flex items-center space-x-4">
                                                     <label class="flex items-center cursor-pointer">
-                                                        <input type="checkbox" wire:click="toggleAreaLot('block', {{ $block->id }}, 'regular')" {{ ($block->lotControl->allow_regular_lot ?? true) ? 'checked' : '' }} {{ $supporting_document ? '' : 'disabled' }} class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50">
+                                                        <input type="checkbox" wire:click="queueLotChange('block', {{ $block->id }}, 'regular')" {{ (isset($pendingLotChanges["block_{$block->id}_regular"]) ? !($block->lotControl->allow_regular_lot ?? true) : ($block->lotControl->allow_regular_lot ?? true)) ? 'checked' : '' }} {{ $supporting_document ? '' : 'disabled' }} class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50">
                                                         <span class="ml-2 text-sm text-gray-700 font-medium {{ $supporting_document ? '' : 'opacity-50' }}">Regular Lot</span>
                                                     </label>
                                                     <label class="flex items-center cursor-pointer">
-                                                        <input type="checkbox" wire:click="toggleAreaLot('block', {{ $block->id }}, 'arrear')" {{ ($block->lotControl->allow_arrear_lot ?? true) ? 'checked' : '' }} {{ $supporting_document ? '' : 'disabled' }} class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50">
+                                                        <input type="checkbox" wire:click="queueLotChange('block', {{ $block->id }}, 'arrear')" {{ (isset($pendingLotChanges["block_{$block->id}_arrear"]) ? !($block->lotControl->allow_arrear_lot ?? true) : ($block->lotControl->allow_arrear_lot ?? true)) ? 'checked' : '' }} {{ $supporting_document ? '' : 'disabled' }} class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50">
                                                         <span class="ml-2 text-sm text-gray-700 font-medium {{ $supporting_document ? '' : 'opacity-50' }}">Arrear Lot</span>
                                                     </label>
                                                 </div>
@@ -735,12 +807,13 @@ middleware(['auth', 'verified']);
                                             </td>
                                             <td class="px-4 py-3 whitespace-nowrap">
                                                 <div class="flex items-center space-x-4">
+                                                    @php $rowType = strtolower($row['type']); @endphp
                                                     <label class="flex items-center cursor-pointer">
-                                                        <input type="checkbox" wire:click="toggleAreaLot('{{ strtolower($row['type']) }}', {{ $row['id'] }}, 'regular')" {{ $row['allow_regular_lot'] ? 'checked' : '' }} {{ $supporting_document ? '' : 'disabled' }} class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50">
+                                                        <input type="checkbox" wire:click="queueLotChange('{{ $rowType }}', {{ $row['id'] }}, 'regular')" {{ (isset($pendingLotChanges["{$rowType}_{$row['id']}_regular"]) ? !$row['allow_regular_lot'] : $row['allow_regular_lot']) ? 'checked' : '' }} {{ $supporting_document ? '' : 'disabled' }} class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50">
                                                         <span class="ml-2 text-sm text-gray-700 font-medium {{ $supporting_document ? '' : 'opacity-50' }}">Regular Lot</span>
                                                     </label>
                                                     <label class="flex items-center cursor-pointer">
-                                                        <input type="checkbox" wire:click="toggleAreaLot('{{ strtolower($row['type']) }}', {{ $row['id'] }}, 'arrear')" {{ $row['allow_arrear_lot'] ? 'checked' : '' }} {{ $supporting_document ? '' : 'disabled' }} class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50">
+                                                        <input type="checkbox" wire:click="queueLotChange('{{ $rowType }}', {{ $row['id'] }}, 'arrear')" {{ (isset($pendingLotChanges["{$rowType}_{$row['id']}_arrear"]) ? !$row['allow_arrear_lot'] : $row['allow_arrear_lot']) ? 'checked' : '' }} {{ $supporting_document ? '' : 'disabled' }} class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50">
                                                         <span class="ml-2 text-sm text-gray-700 font-medium {{ $supporting_document ? '' : 'opacity-50' }}">Arrear Lot</span>
                                                     </label>
                                                 </div>
@@ -759,11 +832,11 @@ middleware(['auth', 'verified']);
                                             <td class="px-4 py-3 whitespace-nowrap">
                                                 <div class="flex items-center space-x-4">
                                                     <label class="flex items-center cursor-pointer">
-                                                        <input type="checkbox" wire:click="toggleAreaLot('panchayat', {{ $row->id }}, 'regular')" {{ ($row->lotControl->allow_regular_lot ?? true) ? 'checked' : '' }} {{ $supporting_document ? '' : 'disabled' }} class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50">
+                                                        <input type="checkbox" wire:click="queueLotChange('panchayat', {{ $row->id }}, 'regular')" {{ (isset($pendingLotChanges["panchayat_{$row->id}_regular"]) ? !($row->lotControl->allow_regular_lot ?? true) : ($row->lotControl->allow_regular_lot ?? true)) ? 'checked' : '' }} {{ $supporting_document ? '' : 'disabled' }} class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50">
                                                         <span class="ml-2 text-sm text-gray-700 font-medium {{ $supporting_document ? '' : 'opacity-50' }}">Regular Lot</span>
                                                     </label>
                                                     <label class="flex items-center cursor-pointer">
-                                                        <input type="checkbox" wire:click="toggleAreaLot('panchayat', {{ $row->id }}, 'arrear')" {{ ($row->lotControl->allow_arrear_lot ?? true) ? 'checked' : '' }} {{ $supporting_document ? '' : 'disabled' }} class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50">
+                                                        <input type="checkbox" wire:click="queueLotChange('panchayat', {{ $row->id }}, 'arrear')" {{ (isset($pendingLotChanges["panchayat_{$row->id}_arrear"]) ? !($row->lotControl->allow_arrear_lot ?? true) : ($row->lotControl->allow_arrear_lot ?? true)) ? 'checked' : '' }} {{ $supporting_document ? '' : 'disabled' }} class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50">
                                                         <span class="ml-2 text-sm text-gray-700 font-medium {{ $supporting_document ? '' : 'opacity-50' }}">Arrear Lot</span>
                                                     </label>
                                                 </div>
@@ -782,11 +855,11 @@ middleware(['auth', 'verified']);
                                             <td class="px-4 py-3 whitespace-nowrap">
                                                 <div class="flex items-center space-x-4">
                                                     <label class="flex items-center cursor-pointer">
-                                                        <input type="checkbox" wire:click="toggleAreaLot('municipality', {{ $row->id }}, 'regular')" {{ ($row->lotControl->allow_regular_lot ?? true) ? 'checked' : '' }} {{ $supporting_document ? '' : 'disabled' }} class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50">
+                                                        <input type="checkbox" wire:click="queueLotChange('municipality', {{ $row->id }}, 'regular')" {{ (isset($pendingLotChanges["municipality_{$row->id}_regular"]) ? !($row->lotControl->allow_regular_lot ?? true) : ($row->lotControl->allow_regular_lot ?? true)) ? 'checked' : '' }} {{ $supporting_document ? '' : 'disabled' }} class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50">
                                                         <span class="ml-2 text-sm text-gray-700 font-medium {{ $supporting_document ? '' : 'opacity-50' }}">Regular Lot</span>
                                                     </label>
                                                     <label class="flex items-center cursor-pointer">
-                                                        <input type="checkbox" wire:click="toggleAreaLot('municipality', {{ $row->id }}, 'arrear')" {{ ($row->lotControl->allow_arrear_lot ?? true) ? 'checked' : '' }} {{ $supporting_document ? '' : 'disabled' }} class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50">
+                                                        <input type="checkbox" wire:click="queueLotChange('municipality', {{ $row->id }}, 'arrear')" {{ (isset($pendingLotChanges["municipality_{$row->id}_arrear"]) ? !($row->lotControl->allow_arrear_lot ?? true) : ($row->lotControl->allow_arrear_lot ?? true)) ? 'checked' : '' }} {{ $supporting_document ? '' : 'disabled' }} class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50">
                                                         <span class="ml-2 text-sm text-gray-700 font-medium {{ $supporting_document ? '' : 'opacity-50' }}">Arrear Lot</span>
                                                     </label>
                                                 </div>
@@ -814,18 +887,27 @@ middleware(['auth', 'verified']);
                                                     <div class="text-red-500 text-xs mt-1">{{ $causeErrors[$row['id']] }}</div>
                                                 @endif
                                             </td>
+                                            @php
+                                                $currentStatus = $row['status'];
+                                                if (isset($pendingBenChanges[$row['id']])) {
+                                                    $currentStatus = $pendingBenChanges[$row['id']]['action'] === 'block' ? 'Block' : 'Unblock';
+                                                }
+                                            @endphp
                                             <td class="px-4 py-3 whitespace-nowrap">
-                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $row['status'] === 'Unblock' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
-                                                    {{ $row['status'] === 'Unblock' ? 'Unblocked' : 'Blocked' }}
+                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $currentStatus === 'Unblock' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
+                                                    {{ $currentStatus === 'Unblock' ? 'Unblocked' : 'Blocked' }}
+                                                    @if(isset($pendingBenChanges[$row['id']]))
+                                                        <span class="ml-1 text-[10px] opacity-70">(Pending)</span>
+                                                    @endif
                                                 </span>
                                             </td>
                                             <td class="px-4 py-3 whitespace-nowrap">
-                                                @if($row['status'] === 'Unblock')
-                                                    <button wire:click="blockBeneficiary({{ $row['id'] }})" wire:confirm="Are you sure you want to block this beneficiary?" class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                                                @if($currentStatus === 'Unblock')
+                                                    <button wire:click="queueBenChange({{ $row['id'] }}, 'block')" class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
                                                         Block
                                                     </button>
                                                 @else
-                                                    <button wire:click="unblockBeneficiary({{ $row['id'] }})" wire:confirm="Are you sure you want to unblock this beneficiary?" class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                                                    <button wire:click="queueBenChange({{ $row['id'] }}, 'unblock')" class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
                                                         Unblock
                                                     </button>
                                                 @endif
@@ -837,6 +919,14 @@ middleware(['auth', 'verified']);
                         </table>
                     </div>
                 </div>
+                
+                @if(count($pendingLotChanges) > 0 || count($pendingBenChanges) > 0)
+                <div class="px-4 py-4 bg-gray-50 border-t border-gray-200 flex justify-end">
+                    <button wire:click="submitChanges" class="px-6 py-2.5 bg-green-600 text-white rounded-lg shadow hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 font-bold text-sm tracking-wide transition-all duration-300">
+                        Submit Changes
+                    </button>
+                </div>
+                @endif
             </div>
             @endif
 

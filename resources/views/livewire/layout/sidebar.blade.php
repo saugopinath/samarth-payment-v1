@@ -50,6 +50,7 @@ new class extends Component
                 <a href="{{ route('management.schemes') }}" wire:navigate class="block px-3 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('management.schemes') ? 'bg-amber-500 text-white font-medium shadow-sm' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">Schemes Config</a>
                 <a href="{{ route('management.scheme-doc-mappings') }}" wire:navigate class="block px-3 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('management.scheme-doc-mappings') ? 'bg-amber-500 text-white font-medium shadow-sm' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">Scheme Doc Mappings</a>
                 <a href="{{ route('management.codemasters') }}" wire:navigate class="block px-3 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('management.codemasters') ? 'bg-amber-500 text-white font-medium shadow-sm' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">Codemasters</a>
+                <a href="{{ route('management.document-types') }}" wire:navigate class="block px-3 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('management.document-types') ? 'bg-amber-500 text-white font-medium shadow-sm' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">Document Types</a>
             </div>
         </div>
         
