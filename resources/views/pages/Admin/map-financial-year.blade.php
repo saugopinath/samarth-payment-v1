@@ -56,7 +56,7 @@ middleware(['auth', 'verified']);
                 return [
                     'financialYears' => $years,
                     'schemes' => Scheme::where('is_active', true)->get(),
-                    'dbMonths' => Month::where('is_active', true)->orderBy('display_order')->pluck('name')->toArray(),
+                    'dbMonths' => Month::where('is_active', true)->orderBy('display_order')->pluck('name', 'code')->toArray(),
                     'mappedAmounts' => $mappedAmounts,
                     'monthLots' => $monthLots,
                     'targetPaymentModes' => $targetPaymentModes,
@@ -71,24 +71,21 @@ middleware(['auth', 'verified']);
                 $this->show_results = true;
             };
             
-            $toggleMappedLot = function ($month, $schemeId, $type) {
+            $toggleMappedLot = function ($monthCode, $schemeId, $type) {
+                $settingType = $type . '_create'; // regular_create or arrear_create
                 $lot = \App\Models\FinancialYearMonthLot::firstOrNew([
                     'financial_year' => $this->financial_year,
-                    'month' => $month,
-                    'scheme_id' => $schemeId
+                    'month' => $monthCode,
+                    'scheme_id' => $schemeId,
+                    'type' => $settingType,
                 ]);
                 
-                if ($type === 'regular') {
-                    $lot->is_regular_lot = !$lot->is_regular_lot;
-                } elseif ($type === 'arrear') {
-                    $lot->is_arrear_lot = !$lot->is_arrear_lot;
-                }
-                
+                $lot->is_active = !$lot->is_active;
                 $lot->save();
             };
 
-            $mapScheme = function ($month) {
-                $schemeId = $this->selected_schemes[$month] ?? null;
+            $mapScheme = function ($monthCode, $monthName) {
+                $schemeId = $this->selected_schemes[$monthCode] ?? null;
                 if (!$schemeId) {
                     return;
                 }
@@ -97,7 +94,7 @@ middleware(['auth', 'verified']);
                     return;
                 }
 
-                $monthField = strtolower($month) . '_amount';
+                $monthField = strtolower($monthName) . '_amount';
 
                 $record = \App\Models\SchemePaymentAmount::firstOrCreate(
                     [
@@ -116,28 +113,46 @@ middleware(['auth', 'verified']);
                     $record->save();
                 }
 
-                \App\Models\FinancialYearMonthLot::updateOrCreate(
-                    [
-                        'financial_year' => $this->financial_year,
-                        'month' => $month,
-                        'scheme_id' => $schemeId
-                    ],
-                    [
-                        'is_regular_lot' => $this->new_lot_status[$month]['regular'] ?? false,
-                        'is_arrear_lot' => $this->new_lot_status[$month]['arrear'] ?? false,
-                    ]
-                );
+                // Save regular lot creation setting
+                if (!empty($this->new_lot_status[$monthCode]['regular'])) {
+                    \App\Models\FinancialYearMonthLot::updateOrCreate(
+                        [
+                            'financial_year' => $this->financial_year,
+                            'month' => $monthCode,
+                            'scheme_id' => $schemeId,
+                            'type' => 'regular_create'
+                        ],
+                        [
+                            'is_active' => true,
+                        ]
+                    );
+                }
 
-                $this->selected_schemes[$month] = '';
-                $this->new_lot_status[$month] = ['regular' => false, 'arrear' => false];
+                // Save arrear lot creation setting
+                if (!empty($this->new_lot_status[$monthCode]['arrear'])) {
+                    \App\Models\FinancialYearMonthLot::updateOrCreate(
+                        [
+                            'financial_year' => $this->financial_year,
+                            'month' => $monthCode,
+                            'scheme_id' => $schemeId,
+                            'type' => 'arrear_create'
+                        ],
+                        [
+                            'is_active' => true,
+                        ]
+                    );
+                }
+
+                $this->selected_schemes[$monthCode] = '';
+                $this->new_lot_status[$monthCode] = ['regular' => false, 'arrear' => false];
             };
 
-            $unmapScheme = function ($month, $schemeId) {
+            $unmapScheme = function ($monthCode, $monthName, $schemeId) {
                 if (empty($this->financial_year)) {
                     return;
                 }
 
-                $monthField = strtolower($month) . '_amount';
+                $monthField = strtolower($monthName) . '_amount';
                 $record = \App\Models\SchemePaymentAmount::where('scheme_id', $schemeId)
                     ->where('financial_year', $this->financial_year)
                     ->first();
@@ -312,22 +327,22 @@ middleware(['auth', 'verified']);
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
-                            @foreach($dbMonths as $mIndex => $month)
+                            @foreach($dbMonths as $mCode => $mName)
                             <tr>
                                 <td class="px-4 py-3 text-gray-600 align-top border-r border-gray-200 w-24">
-                                    {{ $month }}
+                                    {{ $mName }}
                                 </td>
                                 <td class="px-4 py-3 align-top border-r border-gray-200">
                                     <div class="space-y-4">
                                         @php
-                                            $monthField = strtolower($month) . '_amount';
+                                            $monthField = strtolower($mName) . '_amount';
                                             $count = 1;
                                         @endphp
                                         @foreach($mappedAmounts as $mapped)
                                             @if(isset($mapped->$monthField) && $mapped->$monthField > 0)
                                                 @php 
                                                     $sch = $schemes->firstWhere('id', $mapped->scheme_id);
-                                                    $lot = $monthLots->where('month', $month)->where('scheme_id', $mapped->scheme_id)->first();
+                                                    $lot = $monthLots->where('month', $mCode)->where('scheme_id', $mapped->scheme_id)->first();
                                                 @endphp
                                                 @if($sch)
                                                     <div class="flex items-start justify-between bg-gray-50 p-3 rounded-lg border border-gray-200 shadow-sm">
@@ -339,16 +354,16 @@ middleware(['auth', 'verified']);
                                                             
                                                             <div class="flex items-center space-x-4 mt-3">
                                                                 <label class="flex items-center cursor-pointer">
-                                                                    <input type="checkbox" wire:click="toggleMappedLot('{{ $month }}', {{ $sch->id }}, 'regular')" {{ $lot && $lot->is_regular_lot ? 'checked' : '' }} class="form-checkbox h-3.5 w-3.5 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                                                                    <input type="checkbox" wire:click="toggleMappedLot('{{ $mCode }}', {{ $sch->id }}, 'regular')" {{ $monthLots->where('month', $mCode)->where('scheme_id', $mapped->scheme_id)->where('type', 'regular_create')->where('is_active', true)->first() ? 'checked' : '' }} class="form-checkbox h-3.5 w-3.5 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
                                                                     <span class="ml-1.5 text-xs text-gray-700 font-medium">Regular Lot</span>
                                                                 </label>
                                                                 <label class="flex items-center cursor-pointer">
-                                                                    <input type="checkbox" wire:click="toggleMappedLot('{{ $month }}', {{ $sch->id }}, 'arrear')" {{ $lot && $lot->is_arrear_lot ? 'checked' : '' }} class="form-checkbox h-3.5 w-3.5 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                                                                    <input type="checkbox" wire:click="toggleMappedLot('{{ $mCode }}', {{ $sch->id }}, 'arrear')" {{ $monthLots->where('month', $mCode)->where('scheme_id', $mapped->scheme_id)->where('type', 'arrear_create')->where('is_active', true)->first() ? 'checked' : '' }} class="form-checkbox h-3.5 w-3.5 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
                                                                     <span class="ml-1.5 text-xs text-gray-700 font-medium">Arrear Lot</span>
                                                                 </label>
                                                             </div>
                                                         </div>
-                                                        <button wire:click="unmapScheme('{{ $month }}', {{ $mapped->scheme_id }})" class="text-gray-500 hover:text-red-600 transition-colors bg-white border border-gray-300 rounded p-1 ml-2 shadow-sm">
+                                                        <button wire:click="unmapScheme('{{ $mCode }}', '{{ $mName }}', {{ $mapped->scheme_id }})" class="text-gray-500 hover:text-red-600 transition-colors bg-white border border-gray-300 rounded p-1 ml-2 shadow-sm">
                                                             <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>
                                                         </button>
                                                     </div>
@@ -364,7 +379,7 @@ middleware(['auth', 'verified']);
                                         })->pluck('scheme_id')->toArray();
                                     @endphp
                                     <div class="flex items-center space-x-3">
-                                        <select wire:model="selected_schemes.{{ $month }}" class="border-gray-400 rounded shadow-sm text-sm py-1.5 focus:ring-blue-500 focus:border-blue-500 min-w-[180px]">
+                                        <select wire:model="selected_schemes.{{ $mCode }}" class="border-gray-400 rounded shadow-sm text-sm py-1.5 focus:ring-blue-500 focus:border-blue-500 min-w-[180px]">
                                             <option value="">Select Scheme</option>
                                             @foreach($schemes as $scheme)
                                                 @if(!in_array($scheme->id, $mappedSchemeIds))
@@ -372,7 +387,7 @@ middleware(['auth', 'verified']);
                                                 @endif
                                             @endforeach
                                         </select>
-                                        <button wire:click="mapScheme('{{ $month }}')" class="bg-green-600 text-white px-3 py-1.5 rounded shadow text-sm font-semibold hover:bg-green-700 flex items-center transition-colors whitespace-nowrap self-start mt-1">
+                                        <button wire:click="mapScheme('{{ $mCode }}', '{{ $mName }}')" class="bg-green-600 text-white px-3 py-1.5 rounded shadow text-sm font-semibold hover:bg-green-700 flex items-center transition-colors whitespace-nowrap self-start mt-1">
                                             <svg class="w-3.5 h-3.5 mr-1" fill="currentColor" viewBox="0 0 20 20"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"></path></svg>
                                             Map
                                         </button>

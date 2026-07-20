@@ -10,6 +10,9 @@ class PaymentLotMaster extends Model implements Auditable
      use AuditableTrait;
     protected $connection = 'pgsql_payment';
     protected $table = 'payment_lot_master';
+    protected $primaryKey = 'lot_no';
+    protected $keyType = 'string';
+    public $incrementing = false;
     protected $guarded = [];
 
     //

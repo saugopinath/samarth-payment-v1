@@ -41,9 +41,9 @@ return new class extends Migration
                 lot_month character varying(3) COLLATE pg_catalog.\"default\",
                 lot_year character varying(9) COLLATE pg_catalog.\"default\" NOT NULL,
                 scheme_id smallint NOT NULL,
-                payment_mode integer,
-                lot_type_id integer,
-                cur_status integer,
+                payment_mode character varying(10),
+                lot_type_id character varying(10),
+                cur_status character varying(10),
                 file_name character varying(50) COLLATE pg_catalog.\"default\",
                 created_at timestamp without time zone,
                 updated_at timestamp without time zone,
@@ -63,7 +63,7 @@ return new class extends Migration
        DB::statement("
             ALTER TABLE payment.payment_lot_master
             ADD CONSTRAINT fk_payment_lot_master_cur_status FOREIGN KEY (cur_status)
-            REFERENCES public.codemasters (id) MATCH SIMPLE
+            REFERENCES public.codemasters (code) MATCH SIMPLE
             ON UPDATE NO ACTION
             ON DELETE NO ACTION
         ");
@@ -71,7 +71,7 @@ return new class extends Migration
         DB::statement("
             ALTER TABLE payment.payment_lot_master
             ADD CONSTRAINT fk_payment_lot_master_lot_type_id FOREIGN KEY (lot_type_id)
-            REFERENCES public.codemasters (id) MATCH SIMPLE
+            REFERENCES public.codemasters (code) MATCH SIMPLE
             ON UPDATE NO ACTION
             ON DELETE NO ACTION
         ");
@@ -87,7 +87,7 @@ return new class extends Migration
         DB::statement("
             ALTER TABLE payment.payment_lot_master
             ADD CONSTRAINT fk_payment_lot_master_payment_mode FOREIGN KEY (payment_mode)
-            REFERENCES public.codemasters (id) MATCH SIMPLE
+            REFERENCES public.codemasters (code) MATCH SIMPLE
             ON UPDATE NO ACTION
             ON DELETE NO ACTION
         ");

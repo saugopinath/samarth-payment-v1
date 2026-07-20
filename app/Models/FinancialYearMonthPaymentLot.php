@@ -24,13 +24,12 @@ use OwenIt\Auditing\Auditable as AuditableTrait;
  *
  * @package App\Models
  */
-class FinancialYearMonthLot extends Model implements Auditable
+class FinancialYearMonthPaymentLot extends Model implements Auditable
 {
 	 use AuditableTrait;
-	protected $table = 'financial_year_month_lots';
+	protected $table = 'financial_year_month_payment_lots';
 
 	protected $casts = [
-		'financial_year' => 'int',
 		'is_regular_lot' => 'bool',
 		'is_arrear_lot' => 'bool',
 		'scheme_id' => 'int'
