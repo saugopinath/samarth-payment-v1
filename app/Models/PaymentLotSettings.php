@@ -24,10 +24,10 @@ use OwenIt\Auditing\Auditable as AuditableTrait;
  *
  * @package App\Models
  */
-class FinancialYearMonthPaymentLot extends Model implements Auditable
+class PaymentLotSettings extends Model implements Auditable
 {
 	 use AuditableTrait;
-	protected $table = 'financial_year_month_payment_lots';
+	protected $table = 'payment_lot_settings';
 
 	protected $casts = [
 		'is_regular_lot' => 'bool',
@@ -40,6 +40,19 @@ class FinancialYearMonthPaymentLot extends Model implements Auditable
 		'month',
 		'is_regular_lot',
 		'is_arrear_lot',
-		'scheme_id'
+		'scheme_id',
+		'type'
 	];
+	public function scheme()
+	{
+		return $this->belongsTo(Scheme::class);
+	}
+	public function FinancialYear()
+	{
+		return $this->belongsTo(FinancialYear::class,'financial_year','code');
+	}
+	public function Month()
+	{
+		return $this->belongsTo(Month::class,'month','code');
+	}
 }

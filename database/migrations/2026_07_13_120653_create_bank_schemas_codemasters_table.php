@@ -21,7 +21,7 @@ return new class extends Migration
 
         foreach ($connections as $connection => $schema) {
             DB::connection($connection)->statement("CREATE SCHEMA IF NOT EXISTS {$schema}");
-            DB::connection($connection)->statement('DROP TABLE IF EXISTS codemasters CASCADE');
+            // DB::connection($connection)->statement('DROP TABLE IF EXISTS codemasters CASCADE');
 
             Schema::connection($connection)->create('codemasters', function (Blueprint $table) {
                 $table->tinyIncrements('id');

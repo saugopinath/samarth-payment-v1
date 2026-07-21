@@ -39,8 +39,6 @@ class AppServiceProvider extends ServiceProvider
             ->give(function ($app) {
                 return new \App\Services\IfmsPushService();
             });
-
-      
     }
 
     /**

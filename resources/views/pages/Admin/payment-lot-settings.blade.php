@@ -1,7 +1,7 @@
 <?php
 use function Laravel\Folio\{name, middleware};
 
-name('admin.financial-year-months');
+name('admin.payment-lot-settings');
 middleware(['auth', 'verified']);
 ?>
 <x-app-layout>
@@ -28,6 +28,7 @@ middleware(['auth', 'verified']);
                 'show_modal' => false,
                 'new_financial_year' => '',
                 'new_is_active' => true,
+                'settings' => [],
             ]);
 
             with(function () {
@@ -41,9 +42,8 @@ middleware(['auth', 'verified']);
                     $months = \App\Models\Month::where('is_active', true)->orderBy('display_order')->get();
                     
                     // Fetch existing settings for this scheme and year
-                    $monthLots = \App\Models\FinancialYearMonthPaymentLot::where('scheme_id', $this->selected_scheme)
+                    $monthLots = \App\Models\PaymentLotSettings::where('scheme_id', $this->selected_scheme)
                         ->where('financial_year', $this->selected_financial_year)
-                        ->where('is_active', true)
                         ->get()
                         ->groupBy('month');
                 }
@@ -65,6 +65,20 @@ middleware(['auth', 'verified']);
                     'selected_financial_year.required' => 'Please select a financial year.'
                 ]);
                 
+                $months = \App\Models\Month::where('is_active', true)->orderBy('display_order')->get();
+                $monthLots = \App\Models\PaymentLotSettings::where('scheme_id', $this->selected_scheme)
+                    ->where('financial_year', $this->selected_financial_year)
+                    ->get();
+
+                $this->settings = [];
+                foreach ($months as $month) {
+                    foreach (['52301', '52302', '52303'] as $type) {
+                        $lot = $monthLots->where('month', $month->code)->where('type', $type)->first();
+                        $this->settings[$month->code][$type]['is_regular_lot'] = $lot ? $lot->is_regular_lot : false;
+                        $this->settings[$month->code][$type]['is_arrear_lot'] = $lot ? $lot->is_arrear_lot : false;
+                    }
+                }
+
                 $this->show_months = true;
             };
 
@@ -76,22 +90,28 @@ middleware(['auth', 'verified']);
                 $this->show_months = false;
             };
 
-            $toggleOption = function ($monthCode, $lotType, $optionType) {
+            $finalSubmit = function () {
                 if (empty($this->selected_scheme) || empty($this->selected_financial_year)) {
                     return;
                 }
 
-                $settingType = "{$lotType}_{$optionType}";
-
-                $lot = \App\Models\FinancialYearMonthLot::firstOrNew([
-                    'scheme_id' => $this->selected_scheme,
-                    'financial_year' => $this->selected_financial_year,
-                    'month' => $monthCode,
-                    'type' => $settingType,
-                ]);
-
-                $lot->is_active = !$lot->is_active;
-                $lot->save();
+                foreach ($this->settings as $monthCode => $types) {
+                    foreach ($types as $type => $flags) {
+                        \App\Models\PaymentLotSettings::updateOrCreate(
+                            [
+                                'scheme_id' => $this->selected_scheme,
+                                'financial_year' => $this->selected_financial_year,
+                                'month' => $monthCode,
+                                'type' => $type,
+                            ],
+                            [
+                                'is_regular_lot' => $flags['is_regular_lot'] ?? false,
+                                'is_arrear_lot' => $flags['is_arrear_lot'] ?? false,
+                            ]
+                        );
+                    }
+                }
+                session()->flash('status', 'Payment lot settings saved successfully!');
             };
 
             $openModal = function () {
@@ -133,7 +153,7 @@ middleware(['auth', 'verified']);
                 $this->show_modal = false;
             };
         ?>
-        <div class="max-w-4xl mx-auto sm:px-6 lg:px-8 space-y-6">
+        <div class="max-w-6xl mx-auto sm:px-6 lg:px-8 space-y-6">
             
             @if(session('status'))
                 <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
@@ -194,72 +214,87 @@ middleware(['auth', 'verified']);
                     Month Configurations
                 </span>
 
-                <div class="mt-4 overflow-x-auto border border-gray-200 rounded-lg">
-                    <table class="min-w-full divide-y divide-gray-200 text-sm">
-                        <thead class="bg-gray-50">
+                <div class="mt-4 overflow-x-auto border border-gray-300">
+                    <table class="min-w-full divide-y divide-gray-300 text-sm border-collapse">
+                        <thead class="bg-gray-50 border-b border-gray-300">
                             <tr>
-                                <th scope="col" class="px-4 py-3 text-left font-bold text-gray-700 border-r border-gray-200 uppercase text-xs w-32">
-                                    Month
+                                <th scope="col" class="px-4 py-3 text-left font-bold text-gray-700 border-r border-gray-300 uppercase text-xs w-32">
                                 </th>
-                                <th scope="col" class="px-4 py-3 text-center font-bold text-gray-700 border-r border-gray-200 uppercase text-xs">
-                                    Regular Lot Options
+                                <th scope="col" class="px-4 py-3 text-left font-bold text-gray-700 border-r border-gray-300 text-sm">
+                                    Creation
                                 </th>
-                                <th scope="col" class="px-4 py-3 text-center font-bold text-gray-700 uppercase text-xs">
-                                    Arrear Lot Options
+                                <th scope="col" class="px-4 py-3 text-left font-bold text-gray-700 border-r border-gray-300 text-sm">
+                                    Pushing
+                                </th>
+                                <th scope="col" class="px-4 py-3 text-left font-bold text-gray-700 text-sm">
+                                    Response Receive
                                 </th>
                             </tr>
                         </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
+                        <tbody class="bg-white divide-y divide-gray-300">
                             @forelse($months as $month)
-                            @php
-                                $lots = $monthLots[$month->code] ?? collect();
-                            @endphp
-                            <tr class="hover:bg-gray-50 transition-colors">
-                                <td class="px-4 py-3 text-gray-800 font-semibold align-middle border-r border-gray-200 w-32">
+                            <tr class="hover:bg-gray-50 transition-colors border-b border-gray-300">
+                                <td class="px-4 py-3 text-gray-800 font-semibold align-middle border-r border-gray-300 w-32">
                                     {{ $month->name }}
                                 </td>
-                                <td class="px-4 py-3 align-middle border-r border-gray-200">
-                                    <div class="flex items-center justify-center space-x-6">
+                                
+                                <!-- Creation (52301) -->
+                                <td class="px-4 py-3 align-middle border-r border-gray-300">
+                                    <div class="flex items-center space-x-4">
                                         <label class="flex items-center cursor-pointer group">
-                                            <input type="checkbox" wire:click="toggleOption('{{ $month->code }}', 'regular', 'create')" {{ $lots->where('type', 'regular_create')->first() ? 'checked' : '' }} class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer">
-                                            <span class="ml-2 text-sm text-gray-700 font-medium group-hover:text-blue-600">Create</span>
+                                            <input type="checkbox" wire:model="settings.{{ $month->code }}.52301.is_regular_lot" class="form-checkbox h-4 w-4 text-blue-600 border-gray-400 rounded focus:ring-blue-500 cursor-pointer">
+                                            <span class="ml-1.5 text-sm text-gray-700 font-medium">Regular Lot</span>
                                         </label>
                                         <label class="flex items-center cursor-pointer group">
-                                            <input type="checkbox" wire:click="toggleOption('{{ $month->code }}', 'regular', 'push')" {{ $lots->where('type', 'regular_push')->first() ? 'checked' : '' }} class="form-checkbox h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500 cursor-pointer">
-                                            <span class="ml-2 text-sm text-gray-700 font-medium group-hover:text-purple-600">Push</span>
-                                        </label>
-                                        <label class="flex items-center cursor-pointer group">
-                                            <input type="checkbox" wire:click="toggleOption('{{ $month->code }}', 'regular', 'receive')" {{ $lots->where('type', 'regular_receive')->first() ? 'checked' : '' }} class="form-checkbox h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500 cursor-pointer">
-                                            <span class="ml-2 text-sm text-gray-700 font-medium group-hover:text-green-600">Receive</span>
+                                            <input type="checkbox" wire:model="settings.{{ $month->code }}.52301.is_arrear_lot" class="form-checkbox h-4 w-4 text-blue-600 border-gray-400 rounded focus:ring-blue-500 cursor-pointer">
+                                            <span class="ml-1.5 text-sm text-gray-700 font-medium">Arrear Lot</span>
                                         </label>
                                     </div>
                                 </td>
+
+                                <!-- Pushing (52302) -->
+                                <td class="px-4 py-3 align-middle border-r border-gray-300">
+                                    <div class="flex items-center space-x-4">
+                                        <label class="flex items-center cursor-pointer group">
+                                            <input type="checkbox" wire:model="settings.{{ $month->code }}.52302.is_regular_lot" class="form-checkbox h-4 w-4 text-blue-600 border-gray-400 rounded focus:ring-blue-500 cursor-pointer">
+                                            <span class="ml-1.5 text-sm text-gray-700 font-medium">Regular Lot</span>
+                                        </label>
+                                        <label class="flex items-center cursor-pointer group">
+                                            <input type="checkbox" wire:model="settings.{{ $month->code }}.52302.is_arrear_lot" class="form-checkbox h-4 w-4 text-blue-600 border-gray-400 rounded focus:ring-blue-500 cursor-pointer">
+                                            <span class="ml-1.5 text-sm text-gray-700 font-medium">Arrear Lot</span>
+                                        </label>
+                                    </div>
+                                </td>
+
+                                <!-- Response Receive (52303) -->
                                 <td class="px-4 py-3 align-middle">
-                                    <div class="flex items-center justify-center space-x-6">
+                                    <div class="flex items-center space-x-4">
                                         <label class="flex items-center cursor-pointer group">
-                                            <input type="checkbox" wire:click="toggleOption('{{ $month->code }}', 'arrear', 'create')" {{ $lots->where('type', 'arrear_create')->first() ? 'checked' : '' }} class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer">
-                                            <span class="ml-2 text-sm text-gray-700 font-medium group-hover:text-blue-600">Create</span>
+                                            <input type="checkbox" wire:model="settings.{{ $month->code }}.52303.is_regular_lot" class="form-checkbox h-4 w-4 text-blue-600 border-gray-400 rounded focus:ring-blue-500 cursor-pointer">
+                                            <span class="ml-1.5 text-sm text-gray-700 font-medium">Regular Lot</span>
                                         </label>
                                         <label class="flex items-center cursor-pointer group">
-                                            <input type="checkbox" wire:click="toggleOption('{{ $month->code }}', 'arrear', 'push')" {{ $lots->where('type', 'arrear_push')->first() ? 'checked' : '' }} class="form-checkbox h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500 cursor-pointer">
-                                            <span class="ml-2 text-sm text-gray-700 font-medium group-hover:text-purple-600">Push</span>
-                                        </label>
-                                        <label class="flex items-center cursor-pointer group">
-                                            <input type="checkbox" wire:click="toggleOption('{{ $month->code }}', 'arrear', 'receive')" {{ $lots->where('type', 'arrear_receive')->first() ? 'checked' : '' }} class="form-checkbox h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500 cursor-pointer">
-                                            <span class="ml-2 text-sm text-gray-700 font-medium group-hover:text-green-600">Receive</span>
+                                            <input type="checkbox" wire:model="settings.{{ $month->code }}.52303.is_arrear_lot" class="form-checkbox h-4 w-4 text-blue-600 border-gray-400 rounded focus:ring-blue-500 cursor-pointer">
+                                            <span class="ml-1.5 text-sm text-gray-700 font-medium">Arrear Lot</span>
                                         </label>
                                     </div>
                                 </td>
                             </tr>
                             @empty
                             <tr>
-                                <td colspan="3" class="px-4 py-8 text-center text-gray-500 font-medium">
+                                <td colspan="4" class="px-4 py-8 text-center text-gray-500 font-medium">
                                     No months found.
                                 </td>
                             </tr>
                             @endforelse
                         </tbody>
                     </table>
+                </div>
+                
+                <div class="mt-8 flex justify-center">
+                    <button wire:click="finalSubmit" style="background-color: #5c9ccc; color: white;" class="px-8 py-2.5 rounded shadow text-sm font-semibold tracking-wide hover:opacity-90 transition-opacity">
+                        Final Submit
+                    </button>
                 </div>
             </div>
             @endif

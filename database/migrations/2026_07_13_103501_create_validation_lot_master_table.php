@@ -31,7 +31,7 @@ return new class extends Migration
             (
                 lot_no serial,
                 scheme_id smallint NOT NULL,
-                validation_type_id integer,
+                validation_mode character varying(10),
                 cur_status integer,
                 file_name character varying(50) COLLATE pg_catalog.\"default\",
                 created_at timestamp without time zone,
@@ -60,8 +60,8 @@ return new class extends Migration
 
         DB::statement("
             ALTER TABLE payment.validation_lot_master
-            ADD CONSTRAINT fk_validation_lot_master_validation_type_id FOREIGN KEY (validation_type_id)
-            REFERENCES public.codemasters (id) MATCH SIMPLE
+            ADD CONSTRAINT fk_validation_lot_master_validation_mode_id FOREIGN KEY (validation_mode)
+            REFERENCES public.codemasters (code) MATCH SIMPLE
             ON UPDATE NO ACTION
             ON DELETE NO ACTION
         ");

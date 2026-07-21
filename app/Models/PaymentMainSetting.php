@@ -47,58 +47,49 @@ use OwenIt\Auditing\Auditable as AuditableTrait;
  *
  * @package App\Models
  */
-class SchemePaymentAmount extends Model implements Auditable
+class PaymentMainSetting extends Model implements Auditable
 {
 	 use AuditableTrait;
-	protected $table = 'scheme_payment_amounts';
+	protected $table = 'payment_main_settings';
 
 	protected $casts = [
-		'scheme_id' => 'int',
-		'january_amount' => 'float',
-		'february_amount' => 'float',
-		'march_amount' => 'float',
-		'april_amount' => 'float',
-		'may_amount' => 'float',
-		'june_amount' => 'float',
-		'july_amount' => 'float',
-		'august_amount' => 'float',
-		'september_amount' => 'float',
-		'october_amount' => 'float',
-		'november_amount' => 'float',
-		'december_amount' => 'float'
+		'jan' => 'array',
+		'feb' => 'array',
+		'mar' => 'array',
+		'apr' => 'array',
+		'may' => 'array',
+		'jun' => 'array',
+		'jul' => 'array',
+		'aug' => 'array',
+		'sep' => 'array',
+		'oct' => 'array',
+		'nov' => 'array',
+		'dec' => 'array',
 	];
 
 	protected $fillable = [
-		'scheme_id',
-		'financial_year',
-		'january_amount',
-		'february_amount',
-		'march_amount',
-		'april_amount',
-		'may_amount',
-		'june_amount',
-		'july_amount',
-		'august_amount',
-		'september_amount',
-		'october_amount',
-		'november_amount',
-		'december_amount',
-		'january_payment_mode',
-		'february_payment_mode',
-		'march_payment_mode',
-		'april_payment_mode',
-		'may_payment_mode',
-		'june_payment_mode',
-		'july_payment_mode',
-		'august_payment_mode',
-		'september_payment_mode',
-		'october_payment_mode',
-		'november_payment_mode',
-		'december_payment_mode'
+			'scheme_id',
+			'financial_year',
+			'jan',
+            'feb',
+            'mar',
+            'apr',
+            'may',
+            'jun',
+            'jul',
+            'aug',
+            'sep',
+            'oct',
+            'nov',
+            'dec',
 	];
 
 	public function scheme()
 	{
 		return $this->belongsTo(Scheme::class);
+	}
+	public function FinancialYear()
+	{
+		return $this->belongsTo(FinancialYear::class,'financial_year','code');
 	}
 }

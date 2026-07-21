@@ -118,6 +118,21 @@ class CodemasterSeeder extends Seeder
                 "short_name" => "validation_lot_status",
                 "code" => "522",
             ),
+             array(
+                "name" => "Payment Lot Configuration",
+                "short_name" => "payment_lot_configuration",
+                "code" => "523",
+            ),
+            array(
+                "name" => "Validation Lot Configuration",
+                "short_name" => "validation_lot_configuration",
+                "code" => "524",
+            ),
+             array(
+                "name" => "Validation Mode",
+                "short_name" => "validation_mode",
+                "code" => "525",
+            ),
         );
         foreach ($codemasterParents as $codemasterParent_item) {
             Codemaster::create([
@@ -950,6 +965,55 @@ class CodemasterSeeder extends Seeder
                 "parent_short_code" => "validation_lot_status",
                  "code" => "52204",
             ),
+             array(
+                "name" => "Enable/Disable Payment Lot Create Option",
+                "short_name" => "payment_lot_create_enable_disable",
+                "parent_short_code" => "payment_lot_configuration",
+                 "code" => "52301",
+            ),
+             array(
+                "name" => "Enable/Disable Payment Lot Push Option",
+                "short_name" => "payment_lot_push_enable_disable",
+                "parent_short_code" => "payment_lot_configuration",
+                 "code" => "52302",
+            ),
+             array(
+                "name" => "Enable/Disable Payment Lot Response Option",
+                "short_name" => "payment_lot_response_enable_disable",
+                "parent_short_code" => "payment_lot_configuration",
+                 "code" => "52303",
+            ),
+             array(
+                "name" => "Enable/Disable Validation Lot Create Option",
+                "short_name" => "validation_lot_create_enable_disable",
+                "parent_short_code" => "validation_lot_configuration",
+                 "code" => "52401",
+            ),
+             array(
+                "name" => "Enable/Disable Validation Lot Push Option",
+                "short_name" => "validation_lot_push_enable_disable",
+                "parent_short_code" => "validation_lot_configuration",
+                 "code" => "52402",
+            ),
+             array(
+                "name" => "Enable/Disable Validation Lot Response Option",
+                "short_name" => "validation_lot_response_enable_disable",
+                "parent_short_code" => "validation_lot_configuration",
+                 "code" => "52403",
+            ),
+            array(
+                "name" => "Account Validation",
+                "short_name" => "acc_base_validation",
+                "parent_short_code" => "validation_mode",
+                 "code" => "52501",
+            ),
+             array(
+                "name" => "DBT Validation",
+                "short_name" => "dbt_validation",
+                "parent_short_code" => "validation_mode",
+                 "code" => "52502",
+            ),
+            
         );
         foreach ($codemasterChilds as $codemasterChild_item) {
             Codemaster::create([
