@@ -17,11 +17,17 @@ middleware(['auth', 'verified']);
     @volt
     <div class="py-8 bg-[#fdfaf5] min-h-screen">
         <?php
-            use function Livewire\Volt\{state, with};
+            use function Livewire\Volt\{state, with, updated};
             use App\Models\Scheme;
             use App\Models\Codemaster;
             use App\Models\FinancialYear;
             use App\Models\Month;
+            use App\Models\District;
+            use App\Models\Subdivision;
+            use App\Models\Block;
+            use App\Models\Municipality;
+            use App\Models\Panchayat;
+            use App\Models\Ward;
 
             state([
                 'payment_type' => '',
@@ -31,6 +37,14 @@ middleware(['auth', 'verified']);
                 'lot_financial_year' => '',
                 'lot_month' => '',
                 'target_payment_mode' => '',
+                'district_id' => '',
+                'rural_urban' => '',
+                'subdivision_id' => '',
+                'block_id' => '',
+                'municipality_id' => '',
+                'gp_id' => '',
+                'ward_id' => '',
+                'previewSummary' => null,
             ]);
 
             $updatedScheme = function ($value) {
@@ -51,41 +65,82 @@ middleware(['auth', 'verified']);
                 $this->target_payment_mode = '';
                 
                 if ($this->scheme && $this->lot_financial_year && $this->lot_month) {
-                    $amountRecord = \App\Models\SchemePaymentAmount::where('scheme_id', $this->scheme)
+                    $setting = \App\Models\PaymentMainSetting::where('scheme_id', $this->scheme)
                         ->where('financial_year', $this->lot_financial_year)
                         ->first();
                         
-                    if ($amountRecord) {
-                        $monthName = \App\Models\Month::where('code', $this->lot_month)->value('name');
-                        $monthField = strtolower($monthName) . '_payment_mode';
-                        if (!empty($amountRecord->$monthField)) {
-                            $this->target_payment_mode = $amountRecord->$monthField;
-                        }
-                    }
-
-                    $settings = \App\Models\FinancialYearMonthLot::where('scheme_id', $this->scheme)
-                        ->where('financial_year', $this->lot_financial_year)
-                        ->where('month', $this->lot_month)
-                        ->where('is_active', true)
-                        ->pluck('type')->toArray();
-
-                    if (!empty($settings)) {
-                        $allLotTypes = \App\Models\Codemaster::where('parent_short_code', 'lot_type')->where('is_active', true)->pluck('name', 'code')->toArray();
-                        $validLotTypes = [];
-                        foreach ($allLotTypes as $code => $name) {
-                            if (stripos($name, 'REGULAR') !== false && in_array('regular_create', $settings)) {
-                                $validLotTypes[$code] = $name;
+                    if ($setting) {
+                        $monthField = strtolower($this->lot_month);
+                        $monthData = $setting->$monthField;
+                        if (is_array($monthData)) {
+                            if (!empty($monthData['payment_mode'])) {
+                                $this->target_payment_mode = $monthData['payment_mode'];
                             }
-                            if ((stripos($name, 'ARREAR') !== false || stripos($name, 'ARRER') !== false) && in_array('arrear_create', $settings)) {
-                                $validLotTypes[$code] = $name;
+                            if (!empty($monthData['payment_type'])) {
+                                $this->payment_type = $monthData['payment_type'];
                             }
-                        }
-                        if (count($validLotTypes) === 1) {
-                            $this->lot_type = array_key_first($validLotTypes);
+
+                            if (isset($monthData['52301'])) {
+                                $isRegular = $monthData['52301']['is_regular_lot'] ?? false;
+                                $isArrear = $monthData['52301']['is_arrear_lot'] ?? false;
+
+                                $allLotTypes = \App\Models\Codemaster::where('parent_short_code', 'lot_type')->where('is_active', true)->pluck('name', 'code')->toArray();
+                                $validLotTypes = [];
+                                foreach ($allLotTypes as $code => $name) {
+                                    if (stripos($name, 'REGULAR') !== false && $isRegular) {
+                                        $validLotTypes[$code] = $name;
+                                    }
+                                    if ((stripos($name, 'ARREAR') !== false || stripos($name, 'ARRER') !== false) && $isArrear) {
+                                        $validLotTypes[$code] = $name;
+                                    }
+                                }
+                                if (count($validLotTypes) === 1) {
+                                    $this->lot_type = array_key_first($validLotTypes);
+                                }
+                            }
                         }
                     }
                 }
             };
+
+            updated([
+                'district_id' => function () {
+                    $this->rural_urban = '';
+                    $this->subdivision_id = '';
+                    $this->block_id = '';
+                    $this->municipality_id = '';
+                    $this->gp_id = '';
+                    $this->ward_id = '';
+                    $this->previewSummary = null;
+                },
+                'rural_urban' => function () {
+                    $this->subdivision_id = '';
+                    $this->block_id = '';
+                    $this->municipality_id = '';
+                    $this->gp_id = '';
+                    $this->ward_id = '';
+                    $this->previewSummary = null;
+                },
+                'subdivision_id' => function () {
+                    $this->municipality_id = '';
+                    $this->ward_id = '';
+                    $this->previewSummary = null;
+                },
+                'block_id' => function () {
+                    $this->gp_id = '';
+                    $this->previewSummary = null;
+                },
+                'municipality_id' => function () {
+                    $this->ward_id = '';
+                    $this->previewSummary = null;
+                },
+                'gp_id' => function () {
+                    $this->previewSummary = null;
+                },
+                'ward_id' => function () {
+                    $this->previewSummary = null;
+                }
+            ]);
 
             with(function () {
                 $allLotTypes = Codemaster::where('parent_short_code', 'lot_type')->where('is_active', true)->pluck('name', 'code')->toArray();
@@ -95,9 +150,7 @@ middleware(['auth', 'verified']);
                 $financialYears = $allFinancialYears;
 
                 if ($this->scheme) {
-                    $availableYears = \App\Models\FinancialYearMonthLot::where('scheme_id', $this->scheme)
-                        ->whereIn('type', ['regular_create', 'arrear_create'])
-                        ->where('is_active', true)
+                    $availableYears = \App\Models\PaymentMainSetting::where('scheme_id', $this->scheme)
                         ->pluck('financial_year')
                         ->toArray();
                         
@@ -113,39 +166,124 @@ middleware(['auth', 'verified']);
                 $months = $allMonths;
 
                 if ($this->scheme && $this->lot_financial_year) {
-                    $availableMonths = \App\Models\FinancialYearMonthLot::where('scheme_id', $this->scheme)
+                    $setting = \App\Models\PaymentMainSetting::where('scheme_id', $this->scheme)
                         ->where('financial_year', $this->lot_financial_year)
-                        ->whereIn('type', ['regular_create', 'arrear_create'])
-                        ->where('is_active', true)
-                        ->pluck('month')
-                        ->toArray();
+                        ->first();
                         
                     $months = [];
-                    foreach ($allMonths as $code => $displayName) {
-                        if (in_array($code, $availableMonths)) {
-                            $months[$code] = $displayName;
+                    if ($setting) {
+                        foreach ($allMonths as $code => $displayName) {
+                            $monthField = strtolower($code);
+                            $monthData = $setting->$monthField;
+                            if (is_array($monthData) && isset($monthData['52301'])) {
+                                if (($monthData['52301']['is_regular_lot'] ?? false) || ($monthData['52301']['is_arrear_lot'] ?? false)) {
+                                    $months[$code] = $displayName;
+                                }
+                            }
                         }
                     }
                 }
 
                 if ($this->scheme && $this->lot_financial_year && $this->lot_month) {
-                    $settings = \App\Models\FinancialYearMonthLot::where('scheme_id', $this->scheme)
+                    $setting = \App\Models\PaymentMainSetting::where('scheme_id', $this->scheme)
                         ->where('financial_year', $this->lot_financial_year)
-                        ->where('month', $this->lot_month)
-                        ->where('is_active', true)
-                        ->pluck('type')->toArray();
+                        ->first();
 
                     $lotTypes = [];
-                    if (!empty($settings)) {
-                        foreach ($allLotTypes as $code => $name) {
-                            if (stripos($name, 'REGULAR') !== false && in_array('regular_create', $settings)) {
-                                $lotTypes[$code] = $name;
-                            }
-                            if ((stripos($name, 'ARREAR') !== false || stripos($name, 'ARRER') !== false) && in_array('arrear_create', $settings)) {
-                                $lotTypes[$code] = $name;
+                    if ($setting) {
+                        $monthField = strtolower($this->lot_month);
+                        $monthData = $setting->$monthField;
+                        if (is_array($monthData) && isset($monthData['52301'])) {
+                            $isRegular = $monthData['52301']['is_regular_lot'] ?? false;
+                            $isArrear = $monthData['52301']['is_arrear_lot'] ?? false;
+
+                            foreach ($allLotTypes as $code => $name) {
+                                if (stripos($name, 'REGULAR') !== false && $isRegular) {
+                                    $lotTypes[$code] = $name;
+                                }
+                                if ((stripos($name, 'ARREAR') !== false || stripos($name, 'ARRER') !== false) && $isArrear) {
+                                    $lotTypes[$code] = $name;
+                                }
                             }
                         }
                     }
+                }
+                $blockedDistrictIds = [];
+                $blockedSubdivIds = [];
+                $blockedBlockIds = [];
+                $blockedMuniIds = [];
+                $blockedGpIds = [];
+                $blockedWardIds = [];
+
+                if ($this->lot_type) {
+                    $selectedLotTypeName = $allLotTypes[$this->lot_type] ?? '';
+                    $blockedColumn = null;
+                    if (stripos($selectedLotTypeName, 'REGULAR') !== false) {
+                        $blockedColumn = 'allow_regular_lot';
+                    } elseif (stripos($selectedLotTypeName, 'ARREAR') !== false || stripos($selectedLotTypeName, 'ARRER') !== false) {
+                        $blockedColumn = 'allow_arrear_lot';
+                    }
+
+                    if ($blockedColumn) {
+                        $lotControls = \App\Models\LotControl::where($blockedColumn, false)->get();
+                        $blockedDistrictIds = $lotControls->where('blockable_type', \App\Models\District::class)->pluck('blockable_id')->toArray();
+                        $blockedSubdivIds = $lotControls->where('blockable_type', \App\Models\Subdivision::class)->pluck('blockable_id')->toArray();
+                        $blockedBlockIds = $lotControls->where('blockable_type', \App\Models\Block::class)->pluck('blockable_id')->toArray();
+                        $blockedMuniIds = $lotControls->where('blockable_type', \App\Models\Municipality::class)->pluck('blockable_id')->toArray();
+                        $blockedGpIds = $lotControls->where('blockable_type', \App\Models\Panchayat::class)->pluck('blockable_id')->toArray();
+                        $blockedWardIds = $lotControls->where('blockable_type', \App\Models\Ward::class)->pluck('blockable_id')->toArray();
+                    }
+                }
+
+                $districtsQuery = District::where('is_active', true);
+                if (!empty($blockedDistrictIds)) {
+                    $districtsQuery->whereNotIn('id', $blockedDistrictIds);
+                }
+                $districts = $districtsQuery->orderBy('name')->get();
+                
+                $subdivisions = [];
+                $blocks = [];
+                $municipalities = [];
+                if (!empty($this->district_id)) {
+                    if ($this->rural_urban === '2') { // Rural
+                        $blocksQuery = Block::where('district_id', $this->district_id);
+                        if (!empty($blockedBlockIds)) {
+                            $blocksQuery->whereNotIn('id', $blockedBlockIds);
+                        }
+                        $blocks = $blocksQuery->orderBy('name')->get();
+                    } elseif ($this->rural_urban === '1') { // Urban
+                        $subdivQuery = Subdivision::where('district_id', $this->district_id);
+                        if (!empty($blockedSubdivIds)) {
+                            $subdivQuery->whereNotIn('id', $blockedSubdivIds);
+                        }
+                        $subdivisions = $subdivQuery->orderBy('name')->get();
+                    }
+                }
+                
+                if (!empty($this->subdivision_id) && $this->rural_urban === '1') {
+                    $muniQuery = Municipality::where('subdivision_id', $this->subdivision_id);
+                    if (!empty($blockedMuniIds)) {
+                        $muniQuery->whereNotIn('id', $blockedMuniIds);
+                    }
+                    $municipalities = $muniQuery->orderBy('name')->get();
+                }
+
+                $gps = [];
+                if (!empty($this->block_id)) {
+                    $gpsQuery = Panchayat::where('block_id', $this->block_id);
+                    if (!empty($blockedGpIds)) {
+                        $gpsQuery->whereNotIn('id', $blockedGpIds);
+                    }
+                    $gps = $gpsQuery->orderBy('name')->get();
+                }
+
+                $wards = [];
+                if (!empty($this->municipality_id)) {
+                    $wardsQuery = Ward::where('municipality_id', $this->municipality_id);
+                    if (!empty($blockedWardIds)) {
+                        $wardsQuery->whereNotIn('id', $blockedWardIds);
+                    }
+                    $wards = $wardsQuery->orderBy('name')->get();
                 }
 
                 return [
@@ -154,7 +292,13 @@ middleware(['auth', 'verified']);
                     'months' => $months,
                     'financialYears' => $financialYears,
                     'targetPaymentModes' => Codemaster::where('parent_short_code', 'payment_mode')->where('is_active', true)->pluck('name', 'code')->toArray(),
-                    'lotTypes' => $lotTypes
+                    'lotTypes' => $lotTypes,
+                    'districts' => $districts,
+                    'subdivisions' => $subdivisions,
+                    'blocks' => $blocks,
+                    'municipalities' => $municipalities,
+                    'gps' => $gps,
+                    'wards' => $wards,
                 ];
             });
 
@@ -166,7 +310,14 @@ middleware(['auth', 'verified']);
                     'lot_type',
                     'lot_financial_year',
                     'lot_month',
-                    'target_payment_mode'
+                    'target_payment_mode',
+                    'district_id',
+                    'rural_urban',
+                    'subdivision_id',
+                    'block_id',
+                    'municipality_id',
+                    'gp_id',
+                    'ward_id',
                 ]);
                 
                 // Set default values back
@@ -174,7 +325,39 @@ middleware(['auth', 'verified']);
             };
 
             $preview = function () {
-                // Logic for preview
+                $this->validate([
+                    'scheme' => 'required',
+                    'lot_financial_year' => 'required',
+                    'lot_month' => 'required',
+                    'lot_type' => 'required',
+                    'target_payment_mode' => 'required',
+                ], [
+                    'scheme.required' => 'Please select a scheme.',
+                    'lot_financial_year.required' => 'Please select a financial year.',
+                    'lot_month.required' => 'Please select a lot month.',
+                    'lot_type.required' => 'Please select a lot type.',
+                    'target_payment_mode.required' => 'Target Payment Mode is required.',
+                ]);
+
+                $repository = app(\App\Contracts\Repositories\PaymentLotRepositoryInterface::class);
+                $filters = [
+                    'district_id' => $this->district_id ? District::find($this->district_id)?->lgd_code : null,
+                    'rural_urban_id' => $this->rural_urban,
+                    'block_id' => $this->block_id ? Block::find($this->block_id)?->lgd_code : null,
+                    'municipality_id' => $this->municipality_id ? Municipality::find($this->municipality_id)?->lgd_code : null,
+                    'gp_id' => $this->gp_id ? Panchayat::find($this->gp_id)?->lgd_code : null,
+                    'ward_id' => $this->ward_id ? Ward::find($this->ward_id)?->lgd_code : null,
+                ];
+
+                $this->previewSummary = $repository->previewTransactionLot(
+                    (int) $this->scheme,
+                    $this->lot_financial_year,
+                    $this->lot_month,
+                    $this->payment_type ?? '',
+                    $this->target_payment_mode,
+                    $this->lot_type,
+                    $filters
+                );
             };
 
             $createLot = function () {
@@ -192,17 +375,36 @@ middleware(['auth', 'verified']);
                     'target_payment_mode.required' => 'Target Payment Mode is required.',
                 ]);
 
-                $lotNo = 'LOT' . date('YmdHis') . $this->scheme;
-
-                \App\Models\PaymentLotMaster::create([
-                    'lot_no' => $lotNo,
+                $lotMaster = \App\Models\PaymentLotMaster::create([
                     'lot_month' => $this->lot_month,
                     'lot_year' => $this->lot_financial_year,
                     'scheme_id' => $this->scheme,
                     'payment_mode' => $this->target_payment_mode,
                     'lot_type_id' => $this->lot_type,
-                    'cur_status' => 'PENDING',
+                    'cur_status' => Codemaster::where('code', '52102')->first()->code,
                 ]);
+
+                $repository = app(\App\Contracts\Repositories\PaymentLotRepositoryInterface::class);
+                $filters = [
+                    'district_id' => $this->district_id ? District::find($this->district_id)?->lgd_code : null,
+                    'rural_urban_id' => $this->rural_urban,
+                    'block_id' => $this->block_id ? Block::find($this->block_id)?->lgd_code : null,
+                    'municipality_id' => $this->municipality_id ? Municipality::find($this->municipality_id)?->lgd_code : null,
+                    'gp_id' => $this->gp_id ? Panchayat::find($this->gp_id)?->lgd_code : null,
+                    'ward_id' => $this->ward_id ? Ward::find($this->ward_id)?->lgd_code : null,
+                ];
+
+                $repository->generateTransactionLot(
+                    $lotMaster,
+                    (int) $this->scheme,
+                    $this->lot_financial_year,
+                    $this->lot_month,
+                    $this->payment_type ?? '',
+                    $this->target_payment_mode,
+                    $filters
+                );
+
+                $lotNo = $lotMaster->lot_no;
 
                 session()->flash('status', 'Lot generated successfully! Lot No: ' . $lotNo);
                 $this->resetForm();
@@ -300,7 +502,7 @@ middleware(['auth', 'verified']);
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mt-2 ml-2">
                     <div>
                         <label class="block text-sm font-semibold text-gray-800 mb-2">Lot Type <span class="text-red-500">*</span></label>
-                        <select wire:model="lot_type" class="block w-full border-gray-200 rounded-md shadow-sm text-gray-600 focus:ring-orange-500 focus:border-orange-500 text-sm py-2">
+                        <select wire:model.live="lot_type" class="block w-full border-gray-200 rounded-md shadow-sm text-gray-600 focus:ring-orange-500 focus:border-orange-500 text-sm py-2">
                             <option value="">Select Lot Type</option>
                             @foreach($lotTypes as $value => $label)
                                 <option value="{{ $value }}">{{ $label }}</option>
@@ -320,6 +522,115 @@ middleware(['auth', 'verified']);
                     </div>
                 </div>
             </div>
+
+            <!-- Optional Filters -->
+            <div class="relative bg-white shadow-sm border border-orange-200 rounded-lg p-6 pt-10">
+                <span class="absolute -top-4 left-6 bg-orange-400 text-white px-5 py-1.5 rounded-lg text-sm font-bold shadow-md tracking-wide flex items-center">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path></svg>
+                    Optional Geographical Filters
+                </span>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-2 ml-2">
+                    <!-- District -->
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-800 mb-2">District</label>
+                        <select wire:model.live="district_id" class="block w-full border-gray-200 rounded-md shadow-sm focus:ring-orange-500 focus:border-orange-500 text-sm py-2 text-gray-600">
+                            <option value="">-- Select District --</option>
+                            @foreach($districts as $dist)
+                                <option value="{{ $dist->id }}">{{ $dist->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <!-- Rural/Urban -->
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-800 mb-2">Rural/Urban</label>
+                        <select wire:model.live="rural_urban" class="block w-full border-gray-200 rounded-md shadow-sm focus:ring-orange-500 focus:border-orange-500 text-sm py-2 text-gray-600" {{ empty($district_id) ? 'disabled' : '' }}>
+                            <option value="">-- Select Rural/Urban --</option>
+                            <option value="2">Rural</option>
+                            <option value="1">Urban</option>
+                        </select>
+                    </div>
+
+                    <!-- Block / Subdivision / Municipality -->
+                    @if($rural_urban === '2')
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-800 mb-2">Block</label>
+                            <select wire:model.live="block_id" class="block w-full border-gray-200 rounded-md shadow-sm focus:ring-orange-500 focus:border-orange-500 text-sm py-2 text-gray-600">
+                                <option value="">-- Select Block --</option>
+                                @foreach($blocks as $blk)
+                                    <option value="{{ $blk->id }}">{{ $blk->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @elseif($rural_urban === '1')
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-800 mb-2">Sub-division</label>
+                            <select wire:model.live="subdivision_id" class="block w-full border-gray-200 rounded-md shadow-sm focus:ring-orange-500 focus:border-orange-500 text-sm py-2 text-gray-600">
+                                <option value="">-- Select Sub-division --</option>
+                                @foreach($subdivisions as $sub)
+                                    <option value="{{ $sub->id }}">{{ $sub->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        
+                        @if(!empty($subdivision_id))
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-800 mb-2">Municipality</label>
+                                <select wire:model.live="municipality_id" class="block w-full border-gray-200 rounded-md shadow-sm focus:ring-orange-500 focus:border-orange-500 text-sm py-2 text-gray-600">
+                                    <option value="">-- Select Municipality --</option>
+                                    @foreach($municipalities as $muni)
+                                        <option value="{{ $muni->id }}">{{ $muni->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        @endif
+                    @endif
+
+                    <!-- GP / Ward -->
+                    @if($rural_urban === '2' && !empty($block_id))
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-800 mb-2">Gram Panchayat</label>
+                            <select wire:model="gp_id" class="block w-full border-gray-200 rounded-md shadow-sm focus:ring-orange-500 focus:border-orange-500 text-sm py-2 text-gray-600">
+                                <option value="">-- Select GP --</option>
+                                @foreach($gps as $gp)
+                                    <option value="{{ $gp->id }}">{{ $gp->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @elseif($rural_urban === '1' && !empty($municipality_id))
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-800 mb-2">Ward</label>
+                            <select wire:model="ward_id" class="block w-full border-gray-200 rounded-md shadow-sm focus:ring-orange-500 focus:border-orange-500 text-sm py-2 text-gray-600">
+                                <option value="">-- Select Ward --</option>
+                                @foreach($wards as $ward)
+                                    <option value="{{ $ward->id }}">{{ $ward->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @endif
+                </div>
+            </div>
+
+            <!-- Preview Summary -->
+            @if($previewSummary)
+                <div class="relative bg-white shadow-sm border border-yellow-300 rounded-lg p-6 mt-6">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <svg class="w-6 h-6 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <h3 class="text-lg font-bold text-gray-800">Preview Summary</h3>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 bg-yellow-50 rounded-md p-4 border border-yellow-100">
+                        <div class="flex flex-col">
+                            <span class="text-sm font-semibold text-yellow-700">Total Beneficiaries</span>
+                            <span class="text-2xl font-bold text-gray-900">{{ number_format($previewSummary['beneficiary_count']) }}</span>
+                        </div>
+                        <div class="flex flex-col">
+                            <span class="text-sm font-semibold text-yellow-700">Total Amount Required</span>
+                            <span class="text-2xl font-bold text-gray-900">₹ {{ number_format($previewSummary['total_amount'], 2) }}</span>
+                        </div>
+                    </div>
+                </div>
+            @endif
 
             <!-- Actions -->
             <div class="flex justify-center items-center space-x-4 pt-4 pb-8 border-t border-gray-200 mt-8">

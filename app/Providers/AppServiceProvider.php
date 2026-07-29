@@ -11,6 +11,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->singleton(\App\Contracts\Repositories\PaymentLotRepositoryInterface::class, \App\Repositories\PaymentLotRepository::class);
+
         $this->app->singleton(\App\Services\Otp\OtpGenerator::class, function ($app) {
             return new \App\Services\Otp\OtpGenerator();
         });

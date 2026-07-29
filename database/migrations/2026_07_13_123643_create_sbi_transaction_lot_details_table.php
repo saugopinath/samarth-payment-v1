@@ -42,7 +42,7 @@ return new class extends Migration
                 npci_user_name varchar(20) NULL,
                 agency_cr_ref varchar(50) NOT NULL,
                 credit_payment_reference varchar(20) NULL,
-                CONSTRAINT pk_transaction_lot_details_lot_scheme_sbi PRIMARY KEY (lot_no, lot_year, scheme_id)
+                CONSTRAINT pk_transaction_lot_details_lot_scheme_sbi PRIMARY KEY (lot_no, lot_year, scheme_id,ben_id)
             ) PARTITION BY LIST (lot_year);
         ");
 

@@ -87,8 +87,8 @@ new class extends Component
         </div>
 
         <!-- Payments -->
-        <div x-data="{ open: {{ request()->routeIs('admin.payment-lot-generation', 'admin.block-unblock-payment', 'admin.map-financial-year', 'admin.payment-lot-settings', 'admin.validation-lot-settings') ? 'true' : 'false' }} }">
-            <button @click="open = !open" class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-colors {{ request()->routeIs('admin.payment-lot-generation', 'admin.block-unblock-payment', 'admin.map-financial-year', 'admin.payment-lot-settings', 'admin.validation-lot-settings') ? 'bg-slate-800/50 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
+        <div x-data="{ open: {{ request()->routeIs('admin.payment-lot-generation', 'admin.payment-lot-transaction', 'admin.block-unblock-payment', 'admin.map-financial-year', 'admin.payment-lot-settings', 'admin.validation-lot-settings') ? 'true' : 'false' }} }">
+            <button @click="open = !open" class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-colors {{ request()->routeIs('admin.payment-lot-generation', 'admin.payment-lot-transaction', 'admin.block-unblock-payment', 'admin.map-financial-year', 'admin.payment-lot-settings', 'admin.validation-lot-settings') ? 'bg-slate-800/50 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
                 <div class="flex items-center">
                     <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
                     <span class="font-medium">Payments</span>
@@ -97,6 +97,7 @@ new class extends Component
             </button>
             <div x-show="open" x-collapse class="pl-11 pr-3 py-1 space-y-1">
                 <a href="{{ route('admin.payment-lot-generation') }}" wire:navigate class="block px-3 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('admin.payment-lot-generation') ? 'bg-amber-500 text-white font-medium shadow-sm' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">Lot Generation</a>
+                <a href="{{ route('admin.payment-lot-transaction') }}" wire:navigate class="block px-3 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('admin.payment-lot-transaction') ? 'bg-amber-500 text-white font-medium shadow-sm' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">Lot Transaction</a>
                 <a href="{{ route('admin.block-unblock-payment') }}" wire:navigate class="block px-3 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('admin.block-unblock-payment') ? 'bg-amber-500 text-white font-medium shadow-sm' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">Block-Unblock</a>
                 <a href="{{ route('admin.map-financial-year') }}" wire:navigate class="block px-3 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('admin.map-financial-year') ? 'bg-amber-500 text-white font-medium shadow-sm' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">Map Fin Year</a>
                 <a href="{{ route('admin.payment-lot-settings') }}" wire:navigate class="block px-3 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('admin.payment-lot-settings') ? 'bg-amber-500 text-white font-medium shadow-sm' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">Payment Lot Setting</a>
