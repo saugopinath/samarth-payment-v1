@@ -59,43 +59,7 @@ middleware(['auth', 'verified']);
                 $this->lot_type = '';
                 $this->target_payment_mode = '';
                 
-                if ($this->scheme && $this->lot_financial_year && $this->lot_month) {
-                    $setting = \App\Models\PaymentMainSetting::where('scheme_id', $this->scheme)
-                        ->where('financial_year', $this->lot_financial_year)
-                        ->first();
-                        
-                    if ($setting) {
-                        $monthField = strtolower($this->lot_month);
-                        $monthData = $setting->$monthField;
-                        if (is_array($monthData)) {
-                            if (!empty($monthData['payment_mode'])) {
-                                $this->target_payment_mode = $monthData['payment_mode'];
-                            }
-                            if (!empty($monthData['payment_type'])) {
-                                $this->payment_type = $monthData['payment_type'];
-                            }
-
-                            if (isset($monthData['52301'])) {
-                                $isRegular = $monthData['52301']['is_regular_lot'] ?? false;
-                                $isArrear = $monthData['52301']['is_arrear_lot'] ?? false;
-
-                                $allLotTypes = \App\Models\Codemaster::where('parent_short_code', 'lot_type')->where('is_active', true)->pluck('name', 'code')->toArray();
-                                $validLotTypes = [];
-                                foreach ($allLotTypes as $code => $name) {
-                                    if (stripos($name, 'REGULAR') !== false && $isRegular) {
-                                        $validLotTypes[$code] = $name;
-                                    }
-                                    if ((stripos($name, 'ARREAR') !== false || stripos($name, 'ARRER') !== false) && $isArrear) {
-                                        $validLotTypes[$code] = $name;
-                                    }
-                                }
-                                if (count($validLotTypes) === 1) {
-                                    $this->lot_type = array_key_first($validLotTypes);
-                                }
-                            }
-                        }
-                    }
-                }
+          
             };
 
 
@@ -107,65 +71,13 @@ middleware(['auth', 'verified']);
                 $allFinancialYears = FinancialYear::where('is_active', true)->orderBy('name')->pluck('name', 'code')->toArray();
                 $financialYears = $allFinancialYears;
 
-                if ($this->scheme) {
-                    $availableYears = \App\Models\PaymentMainSetting::where('scheme_id', $this->scheme)
-                        ->pluck('financial_year')
-                        ->toArray();
-                        
-                    $financialYears = [];
-                    foreach ($allFinancialYears as $code => $name) {
-                        if (in_array($code, $availableYears)) {
-                            $financialYears[$code] = $name;
-                        }
-                    }
-                }
+               
 
                 $allMonths = Month::where('is_active', true)->orderBy('display_order')->pluck('name', 'code')->toArray();
                 $months = $allMonths;
 
-                if ($this->scheme && $this->lot_financial_year) {
-                    $setting = \App\Models\PaymentMainSetting::where('scheme_id', $this->scheme)
-                        ->where('financial_year', $this->lot_financial_year)
-                        ->first();
-                        
-                    $months = [];
-                    if ($setting) {
-                        foreach ($allMonths as $code => $displayName) {
-                            $monthField = strtolower($code);
-                            $monthData = $setting->$monthField;
-                            if (is_array($monthData) && isset($monthData['52301'])) {
-                                if (($monthData['52301']['is_regular_lot'] ?? false) || ($monthData['52301']['is_arrear_lot'] ?? false)) {
-                                    $months[$code] = $displayName;
-                                }
-                            }
-                        }
-                    }
-                }
 
-                if ($this->scheme && $this->lot_financial_year && $this->lot_month) {
-                    $setting = \App\Models\PaymentMainSetting::where('scheme_id', $this->scheme)
-                        ->where('financial_year', $this->lot_financial_year)
-                        ->first();
-
-                    $lotTypes = [];
-                    if ($setting) {
-                        $monthField = strtolower($this->lot_month);
-                        $monthData = $setting->$monthField;
-                        if (is_array($monthData) && isset($monthData['52301'])) {
-                            $isRegular = $monthData['52301']['is_regular_lot'] ?? false;
-                            $isArrear = $monthData['52301']['is_arrear_lot'] ?? false;
-
-                            foreach ($allLotTypes as $code => $name) {
-                                if (stripos($name, 'REGULAR') !== false && $isRegular) {
-                                    $lotTypes[$code] = $name;
-                                }
-                                if ((stripos($name, 'ARREAR') !== false || stripos($name, 'ARRER') !== false) && $isArrear) {
-                                    $lotTypes[$code] = $name;
-                                }
-                            }
-                        }
-                    }
-                }
+           
                 return [
                     'schemes' => Scheme::where('is_active', true)->get(),
                     'paymentTypes' => Codemaster::where('parent_short_code', 'payment_type')->where('is_active', true)->pluck('name', 'code')->toArray(),
@@ -235,6 +147,53 @@ middleware(['auth', 'verified']);
 
                 $this->lots = $query->orderBy('lot_no', 'desc')->get();
             };
+
+            $signAndPush = function ($lotNo) {
+                try {
+                    $service = app(\App\Services\PaymentLotXmlService::class);
+                    $lotMaster = \App\Models\PaymentLotMaster::where('lot_no', $lotNo)->firstOrFail();
+                    $result = $service->generateAndSignXml($lotMaster);
+                    
+                    $lotMaster->cur_status = '52103';
+                    $lotMaster->save();
+                    
+                    session()->flash('status', 'Lot ' . $lotNo . ' successfully signed.');
+                } catch (\Exception $e) {
+                    session()->flash('status', 'Error signing lot ' . $lotNo . ': ' . $e->getMessage());
+                }
+            };
+
+            $pushLot = function ($lotNo) {
+                try {
+                    $lotMaster = \App\Models\PaymentLotMaster::where('lot_no', $lotNo)->firstOrFail();
+                    
+                    // TODO: Implement actual SFTP/API push logic to SBI here
+                    // $service = app(\App\Services\PaymentLotXmlService::class);
+                    // $service->pushToSBI($lotMaster);
+
+                    $lotMaster->cur_status = '52104';
+                    $lotMaster->save();
+                    
+                    session()->flash('status', 'Lot ' . $lotNo . ' successfully pushed to SBI.');
+                } catch (\Exception $e) {
+                    session()->flash('status', 'Error pushing lot ' . $lotNo . ': ' . $e->getMessage());
+                }
+            };
+
+            $defuncLot = function ($lotNo) {
+                try {
+                    $lotMaster = \App\Models\PaymentLotMaster::where('lot_no', $lotNo)->firstOrFail();
+                    
+                  
+
+                    $lotMaster->cur_status = '52106';
+                    $lotMaster->save();
+                    
+                    session()->flash('status', 'Lot ' . $lotNo . ' successfully marked as defunct.');
+                } catch (\Exception $e) {
+                    session()->flash('status', 'Error defuncting lot ' . $lotNo . ': ' . $e->getMessage());
+                }
+            };
         ?>
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-8">
             
@@ -257,7 +216,7 @@ middleware(['auth', 'verified']);
                     <!-- Scheme -->
                     <div class="w-full">
                         <label class="block text-sm font-semibold text-gray-800 mb-2">Select Scheme <span class="text-red-500">*</span></label>
-                        <select wire:model="scheme" class="block w-full border-gray-200 rounded-md shadow-sm focus:ring-orange-500 focus:border-orange-500 text-sm py-2 text-gray-600">
+                        <select wire:model.live="scheme" class="block w-full border-gray-200 rounded-md shadow-sm focus:ring-orange-500 focus:border-orange-500 text-sm py-2 text-gray-600">
                             <option value="">---Select Scheme---</option>
                             @foreach($schemes as $sch)
                                 <option value="{{ $sch->id }}">{{ $sch->display_name ?? $sch->name }}</option>
@@ -269,7 +228,7 @@ middleware(['auth', 'verified']);
                     <!-- Lot Financial Year -->
                     <div class="w-full">
                         <label class="block text-sm font-semibold text-gray-800 mb-2">Lot Financial Year <span class="text-red-500">*</span></label>
-                        <select wire:model="lot_financial_year" class="block w-full border-gray-200 rounded-md shadow-sm text-gray-600 focus:ring-orange-500 focus:border-orange-500 text-sm py-2">
+                        <select wire:model.live="lot_financial_year" class="block w-full border-gray-200 rounded-md shadow-sm text-gray-600 focus:ring-orange-500 focus:border-orange-500 text-sm py-2">
                             <option value="">Select Financial Year</option>
                             @foreach($financialYears as $value => $label)
                                 <option value="{{ $value }}">{{ $label }}</option>
@@ -281,7 +240,7 @@ middleware(['auth', 'verified']);
                     <!-- Lot Month -->
                     <div class="w-full">
                         <label class="block text-sm font-semibold text-gray-800 mb-2">Lot Month <span class="text-red-500">*</span></label>
-                        <select wire:model="lot_month" class="block w-full border-gray-200 rounded-md shadow-sm focus:ring-orange-500 focus:border-orange-500 text-sm py-2 text-gray-600">
+                        <select wire:model.live="lot_month" class="block w-full border-gray-200 rounded-md shadow-sm focus:ring-orange-500 focus:border-orange-500 text-sm py-2 text-gray-600">
                             <option value="">Select Month</option>
                             @foreach($months as $value => $label)
                                 <option value="{{ $value }}">{{ $label }}</option>
@@ -358,8 +317,7 @@ middleware(['auth', 'verified']);
                             <thead class="bg-orange-50">
                                 <tr>
                                     <th class="px-6 py-3 text-left text-xs font-bold text-orange-800 uppercase tracking-wider">Lot No</th>
-                                    <th class="px-6 py-3 text-left text-xs font-bold text-orange-800 uppercase tracking-wider">Scheme</th>
-                                    <th class="px-6 py-3 text-left text-xs font-bold text-orange-800 uppercase tracking-wider">Month / Year</th>
+                                    <th class="px-6 py-3 text-left text-xs font-bold text-orange-800 uppercase tracking-wider">Lot Creation Date</th>
                                     <th class="px-6 py-3 text-left text-xs font-bold text-orange-800 uppercase tracking-wider">Actions</th>
                                 </tr>
                             </thead>
@@ -367,10 +325,27 @@ middleware(['auth', 'verified']);
                                 @foreach($lots as $lot)
                                     <tr class="hover:bg-orange-50/50 transition-colors">
                                         <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{{ $lot->lot_no }}</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ \App\Models\Scheme::find($lot->scheme_id)?->name ?? $lot->scheme_id }}</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $lot->lot_month }} / {{ $lot->lot_year }}</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $lot->created_at ? $lot->created_at->format('d M Y, h:i A') : 'N/A' }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                                             <button class="text-orange-600 hover:text-orange-900 bg-orange-100 px-3 py-1 rounded-md text-xs font-bold transition-colors">View Details</button>
+                                            @if($lot->cur_status == '52102')
+                                                <button wire:click="signAndPush('{{ $lot->lot_no }}')" class="text-green-600 hover:text-green-900 bg-green-100 px-3 py-1 rounded-md text-xs font-bold transition-colors flex-inline items-center justify-center">
+                                                    <svg class="w-3 h-3 mr-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"></path></svg>
+                                                    Sign Lot
+                                                </button>
+                                            @endif
+                                            @if($lot->cur_status == '52103')
+                                                <button wire:click="pushLot('{{ $lot->lot_no }}')" class="text-blue-600 hover:text-blue-900 bg-blue-100 px-3 py-1 rounded-md text-xs font-bold transition-colors flex-inline items-center justify-center">
+                                                    <svg class="w-3 h-3 mr-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                                                    Push to SBI
+                                                </button>
+                                            @endif
+                                            @if(in_array($lot->cur_status, ['52102', '52103']))
+                                                <button wire:click="defuncLot('{{ $lot->lot_no }}')" class="text-green-600 hover:text-green-900 bg-green-100 px-3 py-1 rounded-md text-xs font-bold transition-colors flex-inline items-center justify-center">
+                                                    <svg class="w-3 h-3 mr-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"></path></svg>
+                                                    Defunc Lot
+                                                </button>
+                                            @endif
                                         </td>
                                     </tr>
                                 @endforeach

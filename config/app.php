@@ -30,6 +30,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | SBI SFTP Server Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Used by the PaymentLotXmlService for pushing XML lots to SBI.
+    |
+    */
+
+    'sbi_sftp_server' => env('SBI_SFTP_SERVER', '127.0.0.1'),
+    'sbi_cert_path' => env('SBI_CERT_PATH', storage_path('app/cert/certificate.pfx')),
+    'sbi_cert_pass' => env('SBI_CERT_PASS', 'JB@WBFin#1984'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Debug Mode
     |--------------------------------------------------------------------------
     |

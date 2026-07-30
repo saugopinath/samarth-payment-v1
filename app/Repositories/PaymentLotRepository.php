@@ -118,6 +118,10 @@ class PaymentLotRepository implements PaymentLotRepositoryInterface
 
         $this->applyLotControlFilters($benDetailsQuery, $lotMaster);
 
+        if (!empty($filters['limit'])) {
+            $benDetailsQuery->limit((int) $filters['limit']);
+        }
+
         $benDetails = $benDetailsQuery->get();
         $sbiData = [];
 
@@ -314,6 +318,10 @@ class PaymentLotRepository implements PaymentLotRepositoryInterface
         }
 
         $count = $benDetailsQuery->count();
+
+        if (!empty($filters['limit']) && $count > $filters['limit']) {
+            $count = (int) $filters['limit'];
+        }
 
         return [
             'beneficiary_count' => $count,

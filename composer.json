@@ -22,6 +22,7 @@
         "maatwebsite/excel": "*",
         "mews/captcha": "*",
         "owen-it/laravel-auditing": "*",
+        "robrichards/xmlseclibs": "*",
         "spatie/laravel-activitylog": "*",
         "spatie/laravel-permission": "*",
         "tymon/jwt-auth": "*"

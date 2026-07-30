@@ -924,22 +924,34 @@ class CodemasterSeeder extends Seeder
                  "code" => "52101",
             ),
              array(
-                "name" => "Generated but yet not Pushed",
-                "short_name" => "payment_lot_status_generated",
+                "name" => "Generated but yet not Signed",
+                "short_name" => "payment_lot_status_not_signed",
                 "parent_short_code" => "payment_lot_status",
                  "code" => "52102",
+            ),
+            array(
+                "name" => "Generated and Signed but yet not Pushed",
+                "short_name" => "payment_lot_status_generated_and_signed",
+                "parent_short_code" => "payment_lot_status",
+                 "code" => "52103",
             ),
             array(
                 "name" => "Generated and Pushed but Response Pending",
                 "short_name" => "payment_lot_status_generated_and_pushed",
                 "parent_short_code" => "payment_lot_status",
-                 "code" => "52103",
+                 "code" => "52104",
             ),
              array(
                 "name" => "Generated,Pushed and Response Received",
                 "short_name" => "payment_lot_status_generated_pushed_response_received",
                 "parent_short_code" => "payment_lot_status",
-                 "code" => "52104",
+                 "code" => "52105",
+            ),
+            array(
+                "name" => "DEFUNCT LOT",
+                "short_name" => "payment_lot_status_defunct",
+                "parent_short_code" => "payment_lot_status",
+                 "code" => "52106",
             ),
              array(
                 "name" => "Not Generated",

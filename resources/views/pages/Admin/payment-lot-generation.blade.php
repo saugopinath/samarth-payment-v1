@@ -44,6 +44,7 @@ middleware(['auth', 'verified']);
                 'municipality_id' => '',
                 'gp_id' => '',
                 'ward_id' => '',
+                'limit' => '',
                 'previewSummary' => null,
             ]);
 
@@ -318,6 +319,7 @@ middleware(['auth', 'verified']);
                     'municipality_id',
                     'gp_id',
                     'ward_id',
+                    'limit',
                 ]);
                 
                 // Set default values back
@@ -347,6 +349,7 @@ middleware(['auth', 'verified']);
                     'municipality_id' => $this->municipality_id ? Municipality::find($this->municipality_id)?->lgd_code : null,
                     'gp_id' => $this->gp_id ? Panchayat::find($this->gp_id)?->lgd_code : null,
                     'ward_id' => $this->ward_id ? Ward::find($this->ward_id)?->lgd_code : null,
+                    'limit' => $this->limit ?: null,
                 ];
 
                 $this->previewSummary = $repository->previewTransactionLot(
@@ -392,6 +395,7 @@ middleware(['auth', 'verified']);
                     'municipality_id' => $this->municipality_id ? Municipality::find($this->municipality_id)?->lgd_code : null,
                     'gp_id' => $this->gp_id ? Panchayat::find($this->gp_id)?->lgd_code : null,
                     'ward_id' => $this->ward_id ? Ward::find($this->ward_id)?->lgd_code : null,
+                    'limit' => $this->limit ?: null,
                 ];
 
                 $repository->generateTransactionLot(
@@ -499,7 +503,7 @@ middleware(['auth', 'verified']);
                     Pending Beneficiary & Amount
                 </span>
                 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mt-2 ml-2">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mt-2 ml-2">
                     <div>
                         <label class="block text-sm font-semibold text-gray-800 mb-2">Lot Type <span class="text-red-500">*</span></label>
                         <select wire:model.live="lot_type" class="block w-full border-gray-200 rounded-md shadow-sm text-gray-600 focus:ring-orange-500 focus:border-orange-500 text-sm py-2">
@@ -519,6 +523,19 @@ middleware(['auth', 'verified']);
                             @endforeach
                         </select>
                         @error('target_payment_mode') <span class="text-red-500 text-xs mt-1 block">{{ $message }}</span> @enderror
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-800 mb-2">Select Limit</label>
+                        <select wire:model="limit" class="block w-full border-gray-200 rounded-md shadow-sm focus:ring-orange-500 focus:border-orange-500 text-sm py-2 text-gray-600">
+                            <option value="">-- All --</option>
+                            <option value="500">500</option>
+                            <option value="1000">1000</option>
+                            <option value="2000">2000</option>
+                            <option value="5000">5000</option>
+                            <option value="10000">10000</option>
+                            <option value="20000">20000</option>
+                            <option value="50000">50000</option>
+                        </select>
                     </div>
                 </div>
             </div>
