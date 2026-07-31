@@ -168,8 +168,8 @@ middleware(['auth', 'verified']);
                     $lotMaster = \App\Models\PaymentLotMaster::where('lot_no', $lotNo)->firstOrFail();
                     
                     // TODO: Implement actual SFTP/API push logic to SBI here
-                    // $service = app(\App\Services\PaymentLotXmlService::class);
-                    // $service->pushToSBI($lotMaster);
+                     $service = app(\App\Services\PaymentLotXmlService::class);
+                     $service->pushToSBI($lotMaster);
 
                     $lotMaster->cur_status = '52104';
                     $lotMaster->save();

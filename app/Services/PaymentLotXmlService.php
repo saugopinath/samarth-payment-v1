@@ -21,8 +21,8 @@ class PaymentLotXmlService
         $this->sbi_sftp_server = config('app.sbi_sftp_server');
 
         // RSA KEY FOR ENCRYPTION
-        $this->dec_privateKey = Storage::get('cert_enc/jb-private-key.pem');
-        $this->enc_publickey = Storage::get('cert_enc/sbi-public-key.pem');
+        $this->dec_privateKey = file_exists(storage_path('app/cert_enc/jb-private-key.pem')) ? file_get_contents(storage_path('app/cert_enc/jb-private-key.pem')) : null;
+        $this->enc_publickey = file_exists(storage_path('app/cert_enc/sbi-public-key.pem')) ? file_get_contents(storage_path('app/cert_enc/sbi-public-key.pem')) : null;
     }
 
     public function generateAndSignXml(PaymentLotMaster $lotMaster)
@@ -118,12 +118,22 @@ class PaymentLotXmlService
         // Encrypt and store
         $file_content = file_get_contents(storage_path('app/sbi/ePay/ToProcess/' . $file_name));
         $encryptedFile = SBIEncryptDecrypt::file_encrypt($file_content, $this->enc_publickey);
-        Storage::put('sbi/ePay/ToProcessEnc/' . $file_name, $encryptedFile);
+        file_put_contents(storage_path('app/sbi/ePay/ToProcessEnc/' . $file_name), $encryptedFile);
 
         return [
             'unsigned' => $unsigned_xml_file,
             'signed' => $signed_xml_file,
             'encrypted' => storage_path('app/sbi/ePay/ToProcessEnc/' . $file_name)
         ];
+    }
+    public function pushToSBI(PaymentLotMaster $lotMaster)
+    {
+          $debitRef = $lotMaster->file_name;
+          $file_name = $debit_ref . '.xml';
+          $storagePath = 'app/sbi/ePay/ToProcess/' . $file_name;
+          $storagePathEnc = 'app/sbi/ePay/ToProcessEnc/' . $file_name;
+          $payment_file_content_without_enc = file_get_contents(storage_path($storagePath));
+          $payment_file_content = file_get_contents(storage_path($storagePathEnc));
+          Storage::disk($this->sbi_sftp_server)->put('ePay/ToProcess/' . $file_name, $payment_file_content);
     }
 }

@@ -81,40 +81,7 @@ class PaymentLotRepository implements PaymentLotRepositoryInterface
             }
         }
 
-        $benDetailsQuery = BenPaymentDetail::where('ben_payment_details.scheme_id', $schemeId)
-            ->where('ben_payment_details.is_eligible', true)
-            ->where('ben_payment_details.is_rejected', false);
-
-        if (!empty($filters['district_id'])) {
-            $benDetailsQuery->where('ben_payment_details.dist_code', $filters['district_id']);
-        }
-        if (!empty($filters['rural_urban_id'])) {
-            $benDetailsQuery->where('ben_payment_details.rural_urban_id', $filters['rural_urban_id']);
-        }
-        if (!empty($filters['block_id'])) {
-            $benDetailsQuery->where('ben_payment_details.block_code', $filters['block_id']);
-        }
-        if (!empty($filters['municipality_id'])) {
-            $benDetailsQuery->where('ben_payment_details.municipality_code', $filters['municipality_id']);
-        }
-        if (!empty($filters['gp_id'])) {
-            $benDetailsQuery->where('ben_payment_details.gp_code', $filters['gp_id']);
-        }
-        if (!empty($filters['ward_id'])) {
-            $benDetailsQuery->where('ben_payment_details.ward_code', $filters['ward_id']);
-        }
-
-        if ($paymentType === '5001') {
-            $benDetailsQuery->join('ben_payment_acc_details', 'ben_payment_details.ben_id', '=', 'ben_payment_acc_details.ben_id')
-                ->where('ben_payment_acc_details.is_clean', true)
-                ->select('ben_payment_details.ben_id', 'ben_payment_details.ben_name', 'ben_payment_acc_details.last_accno as accno', 'ben_payment_acc_details.last_ifsc as ifsc');
-        } elseif ($paymentType === '5002') {
-            $benDetailsQuery->join('ben_payment_abps_details', 'ben_payment_details.ben_id', '=', 'ben_payment_abps_details.ben_id')
-                ->where('ben_payment_abps_details.is_clean', true)
-                ->select('ben_payment_details.ben_id', 'ben_payment_details.ben_name');
-        } else {
-            throw new \InvalidArgumentException("Invalid target payment mode: {$targetPaymentMode}");
-        }
+        $benDetailsQuery = $this->getBaseBeneficiaryQuery($schemeId, $paymentType, $filters, true);
 
         $this->applyLotControlFilters($benDetailsQuery, $lotMaster);
 
@@ -135,8 +102,8 @@ class PaymentLotRepository implements PaymentLotRepositoryInterface
                 'ifsc' => $ben->ifsc ?? null,
                 'accno' => $ben->accno ?? null,
                 'amount_rs' => $amountRs,
-                'debit_reference' => 'DR_' . $lotMaster->lot_no,
-                'agency_cr_ref' => 'AG_' . $lotMaster->lot_no . '_' . $ben->ben_id,
+                'debit_reference' => 'WB003' . \Carbon\Carbon::parse($lotMaster->created_at)->format('dmY') . str_pad($lotMaster->lot_no, 4, '0', STR_PAD_LEFT),
+                'agency_cr_ref' => $ben->dist_code . $ben->scheme_id . $ben->ben_id,
             ];
         }
 
@@ -236,38 +203,7 @@ class PaymentLotRepository implements PaymentLotRepositoryInterface
             }
         }
 
-        $benDetailsQuery = \App\Models\BenPaymentDetail::where('ben_payment_details.scheme_id', $schemeId)
-            ->where('ben_payment_details.is_eligible', true)
-            ->where('ben_payment_details.is_rejected', false);
-
-        if (!empty($filters['district_id'])) {
-            $benDetailsQuery->where('ben_payment_details.dist_code', $filters['district_id']);
-        }
-        if (!empty($filters['rural_urban_id'])) {
-            $benDetailsQuery->where('ben_payment_details.rural_urban_id', $filters['rural_urban_id']);
-        }
-        if (!empty($filters['block_id'])) {
-            $benDetailsQuery->where('ben_payment_details.block_code', $filters['block_id']);
-        }
-        if (!empty($filters['municipality_id'])) {
-            $benDetailsQuery->where('ben_payment_details.municipality_code', $filters['municipality_id']);
-        }
-        if (!empty($filters['gp_id'])) {
-            $benDetailsQuery->where('ben_payment_details.gp_code', $filters['gp_id']);
-        }
-        if (!empty($filters['ward_id'])) {
-            $benDetailsQuery->where('ben_payment_details.ward_code', $filters['ward_id']);
-        }
-
-        if ($paymentType === '5001') {
-            $benDetailsQuery->join('ben_payment_acc_details', 'ben_payment_details.ben_id', '=', 'ben_payment_acc_details.ben_id')
-                ->where('ben_payment_acc_details.is_clean', true);
-        } elseif ($paymentType === '5002') {
-            $benDetailsQuery->join('ben_payment_abps_details', 'ben_payment_details.ben_id', '=', 'ben_payment_abps_details.ben_id')
-                ->where('ben_payment_abps_details.is_clean', true);
-        } else {
-            throw new \InvalidArgumentException("Invalid target payment mode: {$targetPaymentMode}");
-        }
+        $benDetailsQuery = $this->getBaseBeneficiaryQuery($schemeId, $paymentType, $filters, false);
 
         // Apply Lot Control Filters manually without a PaymentLotMaster model instance
         $isRegular = $lotTypeId === '52301';
@@ -327,5 +263,65 @@ class PaymentLotRepository implements PaymentLotRepositoryInterface
             'beneficiary_count' => $count,
             'total_amount' => $count * $amountRs,
         ];
+    }
+
+    /**
+     * Build the base beneficiary query for generating or previewing a lot.
+     * This makes the logic common for all target payment modes.
+     *
+     * @param int $schemeId
+     * @param string $paymentType
+     * @param array $filters
+     * @param bool $includeSelects
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    protected function getBaseBeneficiaryQuery(
+        int $schemeId,
+        string $paymentType,
+        array $filters,
+        bool $includeSelects = true
+    ) {
+        $benDetailsQuery = \App\Models\BenPaymentDetail::where('ben_payment_details.scheme_id', $schemeId)
+            ->where('ben_payment_details.is_eligible', true)
+            ->where('ben_payment_details.is_rejected', false);
+
+        if (!empty($filters['district_id'])) {
+            $benDetailsQuery->where('ben_payment_details.dist_code', $filters['district_id']);
+        }
+        if (!empty($filters['rural_urban_id'])) {
+            $benDetailsQuery->where('ben_payment_details.rural_urban_id', $filters['rural_urban_id']);
+        }
+        if (!empty($filters['block_id'])) {
+            $benDetailsQuery->where('ben_payment_details.block_code', $filters['block_id']);
+        }
+        if (!empty($filters['municipality_id'])) {
+            $benDetailsQuery->where('ben_payment_details.municipality_code', $filters['municipality_id']);
+        }
+        if (!empty($filters['gp_id'])) {
+            $benDetailsQuery->where('ben_payment_details.gp_code', $filters['gp_id']);
+        }
+        if (!empty($filters['ward_id'])) {
+            $benDetailsQuery->where('ben_payment_details.ward_code', $filters['ward_id']);
+        }
+
+        if ($paymentType === '5001') {
+            $benDetailsQuery->join('ben_payment_acc_details', 'ben_payment_details.ben_id', '=', 'ben_payment_acc_details.ben_id')
+                ->where('ben_payment_acc_details.is_clean', true);
+                
+            if ($includeSelects) {
+                $benDetailsQuery->select('ben_payment_details.ben_id', 'ben_payment_details.ben_name', 'ben_payment_details.dist_code', 'ben_payment_details.scheme_id', 'ben_payment_acc_details.last_accno as accno', 'ben_payment_acc_details.last_ifsc as ifsc');
+            }
+        } elseif ($paymentType === '5002') {
+            $benDetailsQuery->join('ben_payment_abps_details', 'ben_payment_details.ben_id', '=', 'ben_payment_abps_details.ben_id')
+                ->where('ben_payment_abps_details.is_clean', true);
+                
+            if ($includeSelects) {
+                $benDetailsQuery->select('ben_payment_details.ben_id', 'ben_payment_details.ben_name', 'ben_payment_details.dist_code', 'ben_payment_details.scheme_id');
+            }
+        } else {
+            throw new \InvalidArgumentException("Invalid payment type: {$paymentType}");
+        }
+
+        return $benDetailsQuery;
     }
 }

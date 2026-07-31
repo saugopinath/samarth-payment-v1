@@ -341,7 +341,7 @@ middleware(['auth', 'verified']);
                     'target_payment_mode.required' => 'Target Payment Mode is required.',
                 ]);
 
-                $repository = app(\App\Contracts\Repositories\PaymentLotRepositoryInterface::class);
+                $service = app(\App\Services\PaymentLotService::class);
                 $filters = [
                     'district_id' => $this->district_id ? District::find($this->district_id)?->lgd_code : null,
                     'rural_urban_id' => $this->rural_urban,
@@ -352,7 +352,7 @@ middleware(['auth', 'verified']);
                     'limit' => $this->limit ?: null,
                 ];
 
-                $this->previewSummary = $repository->previewTransactionLot(
+                $this->previewSummary = $service->previewTransactionLot(
                     (int) $this->scheme,
                     $this->lot_financial_year,
                     $this->lot_month,
@@ -387,7 +387,7 @@ middleware(['auth', 'verified']);
                     'cur_status' => Codemaster::where('code', '52102')->first()->code,
                 ]);
 
-                $repository = app(\App\Contracts\Repositories\PaymentLotRepositoryInterface::class);
+                $service = app(\App\Services\PaymentLotService::class);
                 $filters = [
                     'district_id' => $this->district_id ? District::find($this->district_id)?->lgd_code : null,
                     'rural_urban_id' => $this->rural_urban,
@@ -398,7 +398,7 @@ middleware(['auth', 'verified']);
                     'limit' => $this->limit ?: null,
                 ];
 
-                $repository->generateTransactionLot(
+                $service->generateTransactionLot(
                     $lotMaster,
                     (int) $this->scheme,
                     $this->lot_financial_year,
