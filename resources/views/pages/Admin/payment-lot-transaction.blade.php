@@ -150,7 +150,7 @@ middleware(['auth', 'verified']);
 
             $signAndPush = function ($lotNo) {
                 try {
-                    $service = app(\App\Services\PaymentLotXmlService::class);
+                    $service = \App\Services\PaymentLotXmlService::getInstance();
                     $lotMaster = \App\Models\PaymentLotMaster::where('lot_no', $lotNo)->firstOrFail();
                     $result = $service->generateAndSignXml($lotMaster);
                     
@@ -166,17 +166,60 @@ middleware(['auth', 'verified']);
             $pushLot = function ($lotNo) {
                 try {
                     $lotMaster = \App\Models\PaymentLotMaster::where('lot_no', $lotNo)->firstOrFail();
+
+                    $lotMaster_add = \App\Models\SbiPaymentLotMasterAdditionalInfo::where('lot_no', $lotNo)->firstOrFail();
                     
                     // TODO: Implement actual SFTP/API push logic to SBI here
-                     $service = app(\App\Services\PaymentLotXmlService::class);
-                     $service->pushToSBI($lotMaster);
+                     $service = \App\Services\PaymentLotXmlService::getInstance();
+                     $service->pushToSBI($lotMaster_add);
 
                     $lotMaster->cur_status = '52104';
                     $lotMaster->save();
                     
-                    session()->flash('status', 'Lot ' . $lotNo . ' successfully pushed to SBI.');
+                    session()->flash('status', 'Lot ' . $lotNo . ' successfully pushed to target.');
+                    $this->search();
                 } catch (\Exception $e) {
-                    session()->flash('status', 'Error pushing lot ' . $lotNo . ': ' . $e->getMessage());
+                    session()->flash('error', 'Error pushing lot ' . $lotNo . ': ' . $e->getMessage());
+                }
+            };
+
+            $checkAcknowledge = function ($lotNo) {
+                try {
+                    $lotMaster = \App\Models\PaymentLotMaster::where('lot_no', $lotNo)->firstOrFail();
+                    $lotMaster_add = \App\Models\SbiPaymentLotMasterAdditionalInfo::where('lot_no', $lotNo)->firstOrFail();
+                    
+                    $service = \App\Services\PaymentLotXmlService::getInstance();
+                    $result = $service->checkAcknowledge($lotMaster, $lotMaster_add);
+
+                    if ($result['status'] == 1) {
+                        session()->flash('status', $result['msg']);
+                    } else if (in_array($result['status'], [2, 3, 4])) {
+                        session()->flash('error', $result['msg']);
+                    }
+
+                    $this->search();
+                } catch (\Exception $e) {
+                    session()->flash('error', 'Error checking acknowledgement for lot ' . $lotNo . ': ' . $e->getMessage());
+                }
+            };
+
+            $checkResponse = function ($lotNo) {
+                try {
+                    $lotMaster = \App\Models\PaymentLotMaster::where('lot_no', $lotNo)->firstOrFail();
+                    $lotMaster_add = \App\Models\SbiPaymentLotMasterAdditionalInfo::where('lot_no', $lotNo)->firstOrFail();
+                    
+                    $service = \App\Services\PaymentLotXmlService::getInstance();
+                    $result = $service->checkResponse($lotMaster, $lotMaster_add);
+
+                    if ($result['status'] == 1) {
+                        session()->flash('status', $result['msg']);
+                    } else if (in_array($result['status'], [2, 3, 4])) {
+                        session()->flash('error', $result['msg']);
+                    }
+
+                    $this->search();
+                } catch (\Exception $e) {
+                    session()->flash('error', 'Error checking response for lot ' . $lotNo . ': ' . $e->getMessage());
                 }
             };
 
@@ -338,6 +381,18 @@ middleware(['auth', 'verified']);
                                                 <button wire:click="pushLot('{{ $lot->lot_no }}')" class="text-blue-600 hover:text-blue-900 bg-blue-100 px-3 py-1 rounded-md text-xs font-bold transition-colors flex-inline items-center justify-center">
                                                     <svg class="w-3 h-3 mr-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
                                                     Push to SBI
+                                                </button>
+                                            @endif
+                                            @if($lot->cur_status == '52104')
+                                                <button wire:click="checkAcknowledge('{{ $lot->lot_no }}')" class="text-blue-600 hover:text-blue-900 bg-blue-100 px-3 py-1 rounded-md text-xs font-bold transition-colors flex-inline items-center justify-center">
+                                                    <svg class="w-3 h-3 mr-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                                                    Check Acknowledge
+                                                </button>
+                                            @endif
+                                            @if($lot->cur_status == '52105')
+                                                <button wire:click="checkResponse('{{ $lot->lot_no }}')" class="text-purple-600 hover:text-purple-900 bg-purple-100 px-3 py-1 rounded-md text-xs font-bold transition-colors flex-inline items-center justify-center">
+                                                    <svg class="w-3 h-3 mr-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"></path></svg>
+                                                    Check Response
                                                 </button>
                                             @endif
                                             @if(in_array($lot->cur_status, ['52102', '52103']))

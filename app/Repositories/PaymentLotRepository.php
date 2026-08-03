@@ -7,6 +7,7 @@ use App\Models\PaymentLotMaster;
 use App\Models\PaymentMainSetting;
 use App\Models\BenPaymentDetail;
 use App\Models\SbiTransactionLotDetail;
+use App\Models\SbiPaymentLotMasterAdditionalInfo;
 
 class PaymentLotRepository implements PaymentLotRepositoryInterface
 {
@@ -91,6 +92,7 @@ class PaymentLotRepository implements PaymentLotRepositoryInterface
 
         $benDetails = $benDetailsQuery->get();
         $sbiData = [];
+        $debitReference = 'WB003' . \Carbon\Carbon::parse($lotMaster->created_at)->format('dmY') . str_pad($lotMaster->lot_no, 4, '0', STR_PAD_LEFT);
 
         foreach ($benDetails as $ben) {
             $sbiData[] = [
@@ -102,7 +104,7 @@ class PaymentLotRepository implements PaymentLotRepositoryInterface
                 'ifsc' => $ben->ifsc ?? null,
                 'accno' => $ben->accno ?? null,
                 'amount_rs' => $amountRs,
-                'debit_reference' => 'WB003' . \Carbon\Carbon::parse($lotMaster->created_at)->format('dmY') . str_pad($lotMaster->lot_no, 4, '0', STR_PAD_LEFT),
+                'debit_reference' => $debitReference,
                 'agency_cr_ref' => $ben->dist_code . $ben->scheme_id . $ben->ben_id,
             ];
         }
@@ -114,6 +116,12 @@ class PaymentLotRepository implements PaymentLotRepositoryInterface
         $lotMaster->update([
             'ben_count' => count($sbiData),
             'total_amount' => count($sbiData) * $amountRs,
+        ]);
+        SbiPaymentLotMasterAdditionalInfo::create([
+                    'lot_no' => $lotMaster->lot_no,
+                    'lot_year' => $lotMaster->lot_year,
+                    'scheme_id' => $lotMaster->scheme_id,
+                    'debit_reference' => $debitReference
         ]);
     }
 
