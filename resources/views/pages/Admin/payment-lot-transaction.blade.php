@@ -150,9 +150,9 @@ middleware(['auth', 'verified']);
 
             $signAndPush = function ($lotNo) {
                 try {
-                    $service = \App\Services\PaymentLotXmlService::getInstance();
+                    $service = \App\Services\Integration\PaymentIntegrationFactory::make($lotNo);
                     $lotMaster = \App\Models\PaymentLotMaster::where('lot_no', $lotNo)->firstOrFail();
-                    $result = $service->generateAndSignXml($lotMaster);
+                    $result = $service->preparePayload($lotMaster);
                     
                     $lotMaster->cur_status = '52103';
                     $lotMaster->save();
@@ -170,8 +170,8 @@ middleware(['auth', 'verified']);
                     $lotMaster_add = \App\Models\SbiPaymentLotMasterAdditionalInfo::where('lot_no', $lotNo)->firstOrFail();
                     
                     // TODO: Implement actual SFTP/API push logic to SBI here
-                     $service = \App\Services\PaymentLotXmlService::getInstance();
-                     $service->pushToSBI($lotMaster_add);
+                     $service = \App\Services\Integration\PaymentIntegrationFactory::make($lotNo);
+                     $service->pushToTarget($lotMaster_add);
 
                     $lotMaster->cur_status = '52104';
                     $lotMaster->save();
@@ -188,8 +188,8 @@ middleware(['auth', 'verified']);
                     $lotMaster = \App\Models\PaymentLotMaster::where('lot_no', $lotNo)->firstOrFail();
                     $lotMaster_add = \App\Models\SbiPaymentLotMasterAdditionalInfo::where('lot_no', $lotNo)->firstOrFail();
                     
-                    $service = \App\Services\PaymentLotXmlService::getInstance();
-                    $result = $service->checkAcknowledge($lotMaster, $lotMaster_add);
+                    $service = \App\Services\Integration\PaymentIntegrationFactory::make($lotNo);
+                    $result = $service->checkAcknowledge($lotMaster);
 
                     if ($result['status'] == 1) {
                         session()->flash('status', $result['msg']);
@@ -208,8 +208,8 @@ middleware(['auth', 'verified']);
                     $lotMaster = \App\Models\PaymentLotMaster::where('lot_no', $lotNo)->firstOrFail();
                     $lotMaster_add = \App\Models\SbiPaymentLotMasterAdditionalInfo::where('lot_no', $lotNo)->firstOrFail();
                     
-                    $service = \App\Services\PaymentLotXmlService::getInstance();
-                    $result = $service->checkResponse($lotMaster, $lotMaster_add);
+                    $service = \App\Services\Integration\PaymentIntegrationFactory::make($lotNo);
+                    $result = $service->checkResponse($lotMaster);
 
                     if ($result['status'] == 1) {
                         session()->flash('status', $result['msg']);
@@ -237,12 +237,56 @@ middleware(['auth', 'verified']);
                     session()->flash('status', 'Error defuncting lot ' . $lotNo . ': ' . $e->getMessage());
                 }
             };
+
+            $downloadExcel = function ($lotNo, $type) {
+                return response()->streamDownload(function () use ($lotNo, $type) {
+                    $handle = fopen('php://output', 'w');
+                    // Add BOM for UTF-8 Excel compatibility
+                    fprintf($handle, chr(0xEF).chr(0xBB).chr(0xBF));
+                    
+                    fputcsv($handle, ['Lot No', 'Beneficiary ID', 'Beneficiary Name', 'Account No', 'IFSC', 'Amount (Rs)', 'Status Code', 'Remarks']);
+                    
+                    $query = \App\Models\SbiTransactionLotDetail::where('lot_no', $lotNo);
+                    
+                    if ($type === 'success') {
+                        $query->where('status_code', 'S00');
+                    } elseif ($type === 'failed') {
+                        $query->where(function($q) {
+                            $q->where('status_code', '!=', 'S00')
+                              ->orWhereNull('status_code');
+                        });
+                    }
+                    
+                    $query->chunk(500, function($details) use ($handle) {
+                        foreach ($details as $detail) {
+                            fputcsv($handle, [
+                                $detail->lot_no,
+                                $detail->ben_id,
+                                $detail->ben_name,
+                                $detail->accno,
+                                $detail->ifsc,
+                                $detail->amount_rs,
+                                $detail->status_code,
+                                $detail->remarks
+                            ]);
+                        }
+                    });
+                    
+                    fclose($handle);
+                }, "Lot_{$lotNo}_{$type}_beneficiaries.csv");
+            };
         ?>
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-8">
             
             @if(session('status'))
                 <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
-                    <span class="block sm:inline">{{ session('status') }}</span>
+                    <span class="block sm:inline">{!! session('status') !!}</span>
+                </div>
+            @endif
+
+            @if(session('error'))
+                <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+                    <span class="block sm:inline">{!! session('error') !!}</span>
                 </div>
             @endif
 
@@ -295,7 +339,7 @@ middleware(['auth', 'verified']);
                     <!-- Select Payment Type -->
                     <div class="w-full">
                         <label class="block text-sm font-semibold text-gray-800 mb-2">Select Payment Type <span class="text-red-500">*</span></label>
-                        <select wire:model="payment_type" class="block w-full border-gray-200 rounded-md shadow-sm focus:ring-orange-500 focus:border-orange-500 text-sm py-2 text-gray-600">
+                        <select wire:model.live="payment_type" class="block w-full border-gray-200 rounded-md shadow-sm focus:ring-orange-500 focus:border-orange-500 text-sm py-2 text-gray-600">
                             <option value="">---Select Payment Type---</option>
                             @foreach($paymentTypes as $value => $label)
                                 <option value="{{ $value }}">{{ $label }}</option>
@@ -347,6 +391,9 @@ middleware(['auth', 'verified']);
             
             <!-- Results Table -->
             @if(isset($lots))
+                @php
+                    $paymentModeName = strtolower(\App\Models\Codemaster::where('code', $this->target_payment_mode)->first()?->name ?? 'sbi');
+                @endphp
                 @if($breadcrumb)
                     <div class="mb-6 bg-orange-50 border border-orange-200 rounded-lg p-4 text-sm text-orange-900 font-semibold shadow-sm flex items-center">
                         <svg class="w-5 h-5 mr-3 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -360,46 +407,70 @@ middleware(['auth', 'verified']);
                             <thead class="bg-orange-50">
                                 <tr>
                                     <th class="px-6 py-3 text-left text-xs font-bold text-orange-800 uppercase tracking-wider">Lot No</th>
+                                    <th class="px-6 py-3 text-left text-xs font-bold text-orange-800 uppercase tracking-wider">Beneficiaries</th>
                                     <th class="px-6 py-3 text-left text-xs font-bold text-orange-800 uppercase tracking-wider">Lot Creation Date</th>
                                     <th class="px-6 py-3 text-left text-xs font-bold text-orange-800 uppercase tracking-wider">Actions</th>
                                 </tr>
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-200">
                                 @foreach($lots as $lot)
+                                    @php
+                                        $integrationType = 'sftp';
+                                        $setting = \App\Models\PaymentMainSetting::where('scheme_id', $lot->scheme_id)
+                                            ->where('financial_year', $lot->lot_year)
+                                            ->first();
+                                        if ($setting) {
+                                            $monthField = strtolower($lot->lot_month);
+                                            $monthData = $setting->$monthField;
+                                            if (is_array($monthData) && isset($monthData['integration_type']) && !empty($monthData['integration_type'])) {
+                                                $integrationType = $monthData['integration_type'];
+                                            }
+                                        }
+                                    @endphp
                                     <tr class="hover:bg-orange-50/50 transition-colors">
                                         <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{{ $lot->lot_no }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                                            <div class="flex flex-col space-y-2">
+                                                <div class="flex items-center justify-between w-40">
+                                                    <span class="text-gray-700 font-semibold" title="Total Beneficiaries">Total: {{ $lot->ben_count ?? 0 }}</span>
+                                                    @if(($lot->ben_count ?? 0) > 0)
+                                                        <button wire:click="downloadExcel('{{ $lot->lot_no }}', 'total')" class="text-blue-500 hover:text-blue-700 bg-blue-50 p-1 rounded transition-colors" title="Download Total Beneficiaries CSV">
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                                                        </button>
+                                                    @endif
+                                                </div>
+                                                @if(in_array($lot->cur_status, ['52106']))
+                                                    <div class="flex items-center justify-between w-40">
+                                                        <span class="text-green-600 font-semibold" title="Success Beneficiaries">Success: {{ $lot->success_count ?? 0 }}</span>
+                                                        @if(($lot->success_count ?? 0) > 0)
+                                                            <button wire:click="downloadExcel('{{ $lot->lot_no }}', 'success')" class="text-green-500 hover:text-green-700 bg-green-50 p-1 rounded transition-colors" title="Download Success Beneficiaries CSV">
+                                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                                                            </button>
+                                                        @endif
+                                                    </div>
+                                                    <div class="flex items-center justify-between w-40">
+                                                        <span class="text-red-600 font-semibold" title="Failed Beneficiaries">Failed: {{ $lot->failed_count ?? 0 }}</span>
+                                                        @if(($lot->failed_count ?? 0) > 0)
+                                                            <button wire:click="downloadExcel('{{ $lot->lot_no }}', 'failed')" class="text-red-500 hover:text-red-700 bg-red-50 p-1 rounded transition-colors" title="Download Failed Beneficiaries CSV">
+                                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                                                            </button>
+                                                        @endif
+                                                    </div>
+                                                @endif
+                                            </div>
+                                        </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $lot->created_at ? $lot->created_at->format('d M Y, h:i A') : 'N/A' }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                                            <button class="text-orange-600 hover:text-orange-900 bg-orange-100 px-3 py-1 rounded-md text-xs font-bold transition-colors">View Details</button>
-                                            @if($lot->cur_status == '52102')
-                                                <button wire:click="signAndPush('{{ $lot->lot_no }}')" class="text-green-600 hover:text-green-900 bg-green-100 px-3 py-1 rounded-md text-xs font-bold transition-colors flex-inline items-center justify-center">
-                                                    <svg class="w-3 h-3 mr-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"></path></svg>
-                                                    Sign Lot
-                                                </button>
-                                            @endif
-                                            @if($lot->cur_status == '52103')
-                                                <button wire:click="pushLot('{{ $lot->lot_no }}')" class="text-blue-600 hover:text-blue-900 bg-blue-100 px-3 py-1 rounded-md text-xs font-bold transition-colors flex-inline items-center justify-center">
-                                                    <svg class="w-3 h-3 mr-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
-                                                    Push to SBI
-                                                </button>
-                                            @endif
-                                            @if($lot->cur_status == '52104')
-                                                <button wire:click="checkAcknowledge('{{ $lot->lot_no }}')" class="text-blue-600 hover:text-blue-900 bg-blue-100 px-3 py-1 rounded-md text-xs font-bold transition-colors flex-inline items-center justify-center">
-                                                    <svg class="w-3 h-3 mr-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
-                                                    Check Acknowledge
-                                                </button>
-                                            @endif
-                                            @if($lot->cur_status == '52105')
-                                                <button wire:click="checkResponse('{{ $lot->lot_no }}')" class="text-purple-600 hover:text-purple-900 bg-purple-100 px-3 py-1 rounded-md text-xs font-bold transition-colors flex-inline items-center justify-center">
-                                                    <svg class="w-3 h-3 mr-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"></path></svg>
-                                                    Check Response
-                                                </button>
-                                            @endif
-                                            @if(in_array($lot->cur_status, ['52102', '52103']))
-                                                <button wire:click="defuncLot('{{ $lot->lot_no }}')" class="text-green-600 hover:text-green-900 bg-green-100 px-3 py-1 rounded-md text-xs font-bold transition-colors flex-inline items-center justify-center">
-                                                    <svg class="w-3 h-3 mr-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"></path></svg>
-                                                    Defunc Lot
-                                                </button>
+                                            @if(str_contains($paymentModeName, 'sbi'))
+                                                @include('pages.Admin.partials.payment-lot-actions.sbi', ['lot' => $lot, 'integrationType' => $integrationType])
+                                            @elseif(str_contains($paymentModeName, 'bandhan'))
+                                                @include('pages.Admin.partials.payment-lot-actions.bandhan', ['lot' => $lot, 'integrationType' => $integrationType])
+                                            @elseif(str_contains($paymentModeName, 'ifms v3'))
+                                                @include('pages.Admin.partials.payment-lot-actions.ifms_v3', ['lot' => $lot, 'integrationType' => $integrationType])
+                                            @elseif(str_contains($paymentModeName, 'ifms'))
+                                                @include('pages.Admin.partials.payment-lot-actions.ifms', ['lot' => $lot, 'integrationType' => $integrationType])
+                                            @else
+                                                @include('pages.Admin.partials.payment-lot-actions.sbi', ['lot' => $lot, 'integrationType' => $integrationType])
                                             @endif
                                         </td>
                                     </tr>

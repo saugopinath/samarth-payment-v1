@@ -19,5 +19,8 @@ class PaymentLotMaster extends Model implements Auditable
     public $incrementing = true;
     protected $guarded = [];
 
-    //
+    public function sbiPaymentLotMasterAdditionalInfo()
+    {
+        return $this->hasOne(SbiPaymentLotMasterAdditionalInfo::class, 'lot_no', 'lot_no');
+    }
 }

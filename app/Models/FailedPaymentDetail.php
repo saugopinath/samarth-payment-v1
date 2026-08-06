@@ -10,7 +10,19 @@ class FailedPaymentDetail extends Model implements Auditable
      use AuditableTrait;
     protected $connection = 'pgsql_payment';
     protected $table = 'failed_payment_details';
-    protected $guarded = [];
-
+    protected $fillable = [
+        'lot_no',
+        'ben_id',
+        'scheme_id',
+        'validation_type',
+        'failed_source',
+        'failed_type',
+        'status_code',
+        'remarks',
+        'name_status',
+        'name_status_code',
+        'name_response',
+        'matching_score',
+    ];
     //
 }

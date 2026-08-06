@@ -33,6 +33,11 @@ class SbiTransactionLotDetailObserver
                 $statusCode = Codemaster::where('code',52103)->first()->code;
             }else if($sbiTransactionLotDetail->status_code == '52103'){
                 $statusCode = Codemaster::where('code',52104)->first()->code;
+            }else if($sbiTransactionLotDetail->status_code == 'S00'){
+                $statusCode = Codemaster::where('code',52106)->first()->code;
+            }
+            else if($sbiTransactionLotDetail->status_code == 'S00'){
+                $statusCode = Codemaster::where('code',52106)->first()->code;
             }
             
             if($statusCode){

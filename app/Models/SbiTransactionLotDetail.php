@@ -8,7 +8,7 @@ use OwenIt\Auditing\Auditable as AuditableTrait;
 use App\Observers\SbiTransactionLotDetailObserver;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 
-#[ObservedBy([SbiTransactionLotDetailObserver::class])]
+//#[ObservedBy([SbiTransactionLotDetailObserver::class])]
 class SbiTransactionLotDetail extends Model implements Auditable
 {
      use AuditableTrait;

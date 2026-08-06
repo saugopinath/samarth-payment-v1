@@ -29,8 +29,10 @@ return new class extends Migration
                 lot_no integer NOT NULL,
                 ben_id integer NOT NULL,
                 scheme_id integer NOT NULL,
-                validation_type character varying(3),
-                status_code character varying(3),
+                validation_type character varying(10),
+                failed_source character varying(10),
+                failed_type character varying(10),
+                status_code character varying(10),
                 remarks text,
                 created_at timestamp without time zone,
                 updated_at timestamp without time zone,
@@ -65,6 +67,18 @@ return new class extends Migration
 
             ALTER TABLE IF EXISTS payment.failed_payment_details
                 ADD CONSTRAINT fk_failed_payment_details_validation_type FOREIGN KEY (validation_type)
+                REFERENCES public.codemasters (code) MATCH SIMPLE
+                ON UPDATE NO ACTION
+                ON DELETE NO ACTION;
+
+            ALTER TABLE IF EXISTS payment.failed_payment_details
+                ADD CONSTRAINT fk_failed_payment_details_failed_type FOREIGN KEY (failed_type)
+                REFERENCES public.codemasters (code) MATCH SIMPLE
+                ON UPDATE NO ACTION
+                ON DELETE NO ACTION;
+
+            ALTER TABLE IF EXISTS payment.failed_payment_details
+                ADD CONSTRAINT fk_failed_payment_details_failed_source FOREIGN KEY (failed_source)
                 REFERENCES public.codemasters (code) MATCH SIMPLE
                 ON UPDATE NO ACTION
                 ON DELETE NO ACTION;

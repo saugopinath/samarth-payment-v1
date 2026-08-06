@@ -31,10 +31,11 @@ return new class extends Migration
                 scheme_id integer NOT NULL,
                 ben_id integer NOT NULL,
                 ben_name character varying(200) COLLATE pg_catalog.\"default\",
-                ifsc character(11) COLLATE pg_catalog.\"default\",
-                accno character(20) COLLATE pg_catalog.\"default\",
+                ifsc character varying(11) COLLATE pg_catalog.\"default\",
+                accno character varying(20) COLLATE pg_catalog.\"default\",
+                aadhar_no character varying(500),
                 amount_rs numeric(7,0) NOT NULL,
-                status_code smallint,
+                status_code character varying(10),
                 remarks text COLLATE pg_catalog.\"default\",
                 debit_reference varchar(20) NOT NULL,
                 credit_reference varchar(24) NULL,
@@ -42,6 +43,8 @@ return new class extends Migration
                 npci_user_name varchar(20) NULL,
                 agency_cr_ref varchar(50) NOT NULL,
                 credit_payment_reference varchar(20) NULL,
+                created_at timestamp without time zone,
+                updated_at timestamp without time zone,
                 CONSTRAINT pk_transaction_lot_details_lot_scheme_sbi PRIMARY KEY (lot_no, lot_year, scheme_id,ben_id)
             ) PARTITION BY LIST (lot_year);
         ");

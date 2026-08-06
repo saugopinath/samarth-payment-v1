@@ -83,6 +83,8 @@ middleware(['auth', 'verified']);
                         $this->settings[$colName]['amount'] = $monthData['amount'] ?? 0;
                         $this->settings[$colName]['payment_mode'] = $monthData['payment_mode'] ?? '';
                         $this->settings[$colName]['payment_type'] = $monthData['payment_type'] ?? '';
+                        $this->settings[$colName]['aadhar_type'] = $monthData['aadhar_type'] ?? '';
+                        $this->settings[$colName]['integration_type'] = $monthData['integration_type'] ?? '';
                         
                         foreach (['52301', '52302', '52303'] as $type) {
                             $this->settings[$colName][$type]['is_regular_lot'] = $monthData[$type]['is_regular_lot'] ?? false;
@@ -92,6 +94,8 @@ middleware(['auth', 'verified']);
                         $this->settings[$colName]['amount'] = 0;
                         $this->settings[$colName]['payment_mode'] = '';
                         $this->settings[$colName]['payment_type'] = '';
+                        $this->settings[$colName]['aadhar_type'] = '';
+                        $this->settings[$colName]['integration_type'] = '';
                         
                         foreach (['52301', '52302', '52303'] as $type) {
                             $this->settings[$colName][$type]['is_regular_lot'] = false;
@@ -122,7 +126,9 @@ middleware(['auth', 'verified']);
                     $monthJson = [
                         'amount' => is_numeric($data['amount']) ? (float)$data['amount'] : 0,
                         'payment_mode' => $data['payment_mode'] ?? '',
-                        'payment_type' => $data['payment_type'] ?? ''
+                        'payment_type' => $data['payment_type'] ?? '',
+                        'aadhar_type' => $data['aadhar_type'] ?? '',
+                        'integration_type' => $data['integration_type'] ?? ''
                     ];
                     
                     foreach (['52301', '52302', '52303'] as $type) {
@@ -244,12 +250,20 @@ middleware(['auth', 'verified']);
                                 </td>
                                 
                                 <td class="px-4 py-3 align-middle border-r border-gray-300 text-center">
-                                    <select wire:model="settings.{{ strtolower($month->code) }}.payment_type" class="w-full max-w-[120px] mx-auto border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                    <select wire:model.live="settings.{{ strtolower($month->code) }}.payment_type" class="w-full max-w-[120px] mx-auto border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
                                         <option value="">-- Type --</option>
                                         @foreach($paymentTypes as $type)
                                             <option value="{{ $type->code }}">{{ $type->name }}</option>
                                         @endforeach
                                     </select>
+                                    
+                                    @if(isset($settings[strtolower($month->code)]['payment_type']) && $settings[strtolower($month->code)]['payment_type'] == '5002')
+                                        <select wire:model="settings.{{ strtolower($month->code) }}.aadhar_type" class="mt-2 w-full max-w-[120px] mx-auto border-gray-300 rounded shadow-sm focus:ring-orange-500 focus:border-orange-500 sm:text-sm bg-orange-50">
+                                            <option value="">-- Aadhar Type --</option>
+                                            <option value="raw">Raw</option>
+                                            <option value="token">Token Based</option>
+                                        </select>
+                                    @endif
                                 </td>
 
                                 <td class="px-4 py-3 align-middle border-r border-gray-300 text-center">
@@ -258,6 +272,12 @@ middleware(['auth', 'verified']);
                                         @foreach($paymentModes as $mode)
                                             <option value="{{ $mode->code }}">{{ $mode->name }}</option>
                                         @endforeach
+                                    </select>
+                                    
+                                    <select wire:model="settings.{{ strtolower($month->code) }}.integration_type" class="mt-2 w-full max-w-[120px] mx-auto border-gray-300 rounded shadow-sm focus:ring-purple-500 focus:border-purple-500 sm:text-sm bg-purple-50">
+                                        <option value="">-- Int. Type --</option>
+                                        <option value="api">API Base</option>
+                                        <option value="sftp">SFTP Base</option>
                                     </select>
                                 </td>
                                 

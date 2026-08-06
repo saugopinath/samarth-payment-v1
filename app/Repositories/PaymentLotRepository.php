@@ -18,6 +18,7 @@ class PaymentLotRepository implements PaymentLotRepositoryInterface
      */
     protected array $modeHandlers = [
         '5201' => 'handleSbiTransactionLot',
+        '5202' => 'handleIfmsTransactionLot',
         // Add more target payment modes and handlers here as needed
     ];
 
@@ -80,9 +81,12 @@ class PaymentLotRepository implements PaymentLotRepositoryInterface
             if (is_array($monthData) && isset($monthData['amount'])) {
                 $amountRs = (float) $monthData['amount'];
             }
+            if (is_array($monthData) && isset($monthData['aadhar_type'])) {
+                $aadharType = $monthData['aadhar_type'];
+            }
         }
 
-        $benDetailsQuery = $this->getBaseBeneficiaryQuery($schemeId, $paymentType, $filters, true);
+        $benDetailsQuery = $this->getBaseBeneficiaryQuery($schemeId, $paymentType, $filters, $lotMonth, $financialYear, true);
 
         $this->applyLotControlFilters($benDetailsQuery, $lotMaster);
 
@@ -101,16 +105,96 @@ class PaymentLotRepository implements PaymentLotRepositoryInterface
                 'scheme_id' => $schemeId,
                 'ben_id' => $ben->ben_id,
                 'ben_name' => $ben->ben_name,
-                'ifsc' => $ben->ifsc ?? null,
-                'accno' => $ben->accno ?? null,
+                'ifsc' => $paymentType === '5001' ? ($ben->ifsc ?? null) : null,
+                'accno' => $paymentType === '5001' ? ($ben->accno ?? null) : null,
+                'aadhar_no' => $paymentType === '5002' ? (($aadharType ?? 'raw') === 'token' ? ($ben->aadhar_token ?? null) : ($ben->aadhar_no ?? null)) : null,
                 'amount_rs' => $amountRs,
                 'debit_reference' => $debitReference,
-                'agency_cr_ref' => $ben->dist_code . $ben->scheme_id . $ben->ben_id,
+                'agency_cr_ref' => $ben->created_by_dist_code . $ben->scheme_id . $ben->ben_id,
             ];
         }
 
         foreach (array_chunk($sbiData, 500) as $chunk) {
             SbiTransactionLotDetail::insert($chunk);
+        }
+
+        $lotMaster->update([
+            'ben_count' => count($sbiData),
+            'total_amount' => count($sbiData) * $amountRs,
+        ]);
+        SbiPaymentLotMasterAdditionalInfo::create([
+                    'lot_no' => $lotMaster->lot_no,
+                    'lot_year' => $lotMaster->lot_year,
+                    'scheme_id' => $lotMaster->scheme_id,
+                    'debit_reference' => $debitReference
+        ]);
+    }
+
+        /**
+     * Handle the generation of IFMS transaction lot records.
+     *
+     * @param PaymentLotMaster $lotMaster
+     * @param int $schemeId
+     * @param string $financialYear
+     * @param string $lotMonth
+     * @param string $paymentType
+     * @param array $filters
+     * @return void
+     */
+    protected function handleIfmsTransactionLot(
+        PaymentLotMaster $lotMaster,
+        int $schemeId,
+        string $financialYear,
+        string $lotMonth,
+        string $paymentType,
+        array $filters = []
+    ): void {
+        $amountRs = 0;
+        $setting = PaymentMainSetting::where('scheme_id', $schemeId)
+            ->where('financial_year', $financialYear)
+            ->first();
+
+        if ($setting) {
+            $monthField = strtolower($lotMonth);
+            $monthData = $setting->$monthField;
+            if (is_array($monthData) && isset($monthData['amount'])) {
+                $amountRs = (float) $monthData['amount'];
+            }
+            if (is_array($monthData) && isset($monthData['aadhar_type'])) {
+                $aadharType = $monthData['aadhar_type'];
+            }
+        }
+
+        $benDetailsQuery = $this->getBaseBeneficiaryQuery($schemeId, $paymentType, $filters, $lotMonth, $financialYear, true);
+
+        $this->applyLotControlFilters($benDetailsQuery, $lotMaster);
+
+        if (!empty($filters['limit'])) {
+            $benDetailsQuery->limit((int) $filters['limit']);
+        }
+
+        $benDetails = $benDetailsQuery->get();
+        $sbiData = [];
+
+        foreach ($benDetails as $ben) {
+            $sbiData[] = [
+                'lot_no' => $lotMaster->lot_no,
+                'lot_year' => $financialYear,
+                'scheme_id' => $schemeId,
+                'ben_id' => $ben->ben_id,
+                'ben_name' => $ben->ben_name,
+                'ifsc' => $paymentType === '5001' ? ($ben->ifsc ?? null) : null,
+                'accno' => $paymentType === '5001' ? ($ben->accno ?? null) : null,
+                'aadhar_no' => $paymentType === '5002' ? (($aadharType ?? 'raw') === 'token' ? ($ben->aadhar_token ?? null) : ($ben->aadhar_no ?? null)) : null,
+                'amount_rs' => $amountRs,
+                'pension_id' => $ben->scheme_id,
+                'unique_id' => $ben->created_by_dist_code . $ben->scheme_id . $ben->ben_id,
+                'mobile_no' => $ben->mobile_no
+            ];
+        }
+
+        foreach (array_chunk($sbiData, 500) as $chunk) {
+            IfmsTransactionLotDetail::insert($chunk);
         }
 
         $lotMaster->update([
@@ -211,7 +295,7 @@ class PaymentLotRepository implements PaymentLotRepositoryInterface
             }
         }
 
-        $benDetailsQuery = $this->getBaseBeneficiaryQuery($schemeId, $paymentType, $filters, false);
+        $benDetailsQuery = $this->getBaseBeneficiaryQuery($schemeId, $paymentType, $filters, $lotMonth, $financialYear, false);
 
         // Apply Lot Control Filters manually without a PaymentLotMaster model instance
         $isRegular = $lotTypeId === '52301';
@@ -287,11 +371,22 @@ class PaymentLotRepository implements PaymentLotRepositoryInterface
         int $schemeId,
         string $paymentType,
         array $filters,
+        string $lotMonth,
+        string $financialYear,
         bool $includeSelects = true
     ) {
+        $monthPrefix = strtolower(substr($lotMonth, 0, 3));
+
         $benDetailsQuery = \App\Models\BenPaymentDetail::where('ben_payment_details.scheme_id', $schemeId)
             ->where('ben_payment_details.is_eligible', true)
-            ->where('ben_payment_details.is_rejected', false);
+            ->where('ben_payment_details.is_rejected', false)
+            ->join('ben_monthwise_payment_status', function ($join) use ($monthPrefix, $financialYear, $schemeId) {
+                $join->on('ben_payment_details.ben_id', '=', 'ben_monthwise_payment_status.ben_id')
+                     ->where('ben_monthwise_payment_status.financial_year', $financialYear)
+                     ->where('ben_monthwise_payment_status.scheme_id', $schemeId)
+                     ->where("ben_monthwise_payment_status.{$monthPrefix}_lot_status", 52101)
+                     ->where("ben_monthwise_payment_status.{$monthPrefix}_is_eligible", true);
+            });
 
         if (!empty($filters['district_id'])) {
             $benDetailsQuery->where('ben_payment_details.dist_code', $filters['district_id']);
@@ -317,14 +412,14 @@ class PaymentLotRepository implements PaymentLotRepositoryInterface
                 ->where('ben_payment_acc_details.is_clean', true);
                 
             if ($includeSelects) {
-                $benDetailsQuery->select('ben_payment_details.ben_id', 'ben_payment_details.ben_name', 'ben_payment_details.dist_code', 'ben_payment_details.scheme_id', 'ben_payment_acc_details.last_accno as accno', 'ben_payment_acc_details.last_ifsc as ifsc');
+                $benDetailsQuery->select('ben_payment_details.ben_id', 'ben_payment_details.ben_name', 'ben_payment_details.created_by_dist_code', 'ben_payment_details.scheme_id', 'ben_payment_acc_details.last_accno as accno', 'ben_payment_acc_details.last_ifsc as ifsc');
             }
         } elseif ($paymentType === '5002') {
             $benDetailsQuery->join('ben_payment_abps_details', 'ben_payment_details.ben_id', '=', 'ben_payment_abps_details.ben_id')
                 ->where('ben_payment_abps_details.is_clean', true);
                 
             if ($includeSelects) {
-                $benDetailsQuery->select('ben_payment_details.ben_id', 'ben_payment_details.ben_name', 'ben_payment_details.dist_code', 'ben_payment_details.scheme_id');
+                $benDetailsQuery->select('ben_payment_details.ben_id', 'ben_payment_details.ben_name', 'ben_payment_details.created_by_dist_code', 'ben_payment_details.scheme_id', 'ben_payment_abps_details.aadhar_no');
             }
         } else {
             throw new \InvalidArgumentException("Invalid payment type: {$paymentType}");

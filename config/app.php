@@ -33,7 +33,7 @@ return [
     | SBI SFTP Server Configuration
     |--------------------------------------------------------------------------
     |
-    | Used by the PaymentLotXmlService for pushing XML lots to SBI.
+    | Used by the PaymentLotIntegrationService for pushing XML lots to SBI.
     |
     */
 
