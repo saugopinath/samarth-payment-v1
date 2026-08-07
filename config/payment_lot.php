@@ -41,7 +41,9 @@ return [
             'all_action_done'      => 'PLSIFMSAllActionDone',
         ],
         'bandhan' => [
-            // Additional statuses for Bandhan to be added here
+            'pushed'               => 'PLSBANDHANPUSH',
+            'ack'                  => 'PLSBANDHANACK',
+            'response'             => 'PLSBANDHANRES',
         ],
     ]
 ];
