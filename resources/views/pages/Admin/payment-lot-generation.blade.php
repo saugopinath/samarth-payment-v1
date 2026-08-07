@@ -384,7 +384,7 @@ middleware(['auth', 'verified']);
                     'scheme_id' => $this->scheme,
                     'payment_mode' => $this->target_payment_mode,
                     'lot_type_id' => $this->lot_type,
-                    'cur_status' => Codemaster::where('code', '52102')->first()->code,
+                    'cur_status' => config('payment_lot.status.sbi.not_signed'),
                 ]);
 
                 $service = app(\App\Services\PaymentLotService::class);

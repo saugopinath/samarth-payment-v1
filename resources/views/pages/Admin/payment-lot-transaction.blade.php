@@ -154,7 +154,7 @@ middleware(['auth', 'verified']);
                     $lotMaster = \App\Models\PaymentLotMaster::where('lot_no', $lotNo)->firstOrFail();
                     $result = $service->preparePayload($lotMaster);
                     
-                    $lotMaster->cur_status = '52103';
+                    $lotMaster->cur_status = config('payment_lot.status.sbi.generated_and_signed');
                     $lotMaster->save();
                     
                     session()->flash('status', 'Lot ' . $lotNo . ' successfully signed.');
@@ -173,7 +173,7 @@ middleware(['auth', 'verified']);
                      $service = \App\Services\Integration\PaymentIntegrationFactory::make($lotNo);
                      $service->pushToTarget($lotMaster_add);
 
-                    $lotMaster->cur_status = '52104';
+                    $lotMaster->cur_status = config('payment_lot.status.sbi.generated_and_pushed');
                     $lotMaster->save();
                     
                     session()->flash('status', 'Lot ' . $lotNo . ' successfully pushed to target.');
@@ -229,7 +229,7 @@ middleware(['auth', 'verified']);
                     
                   
 
-                    $lotMaster->cur_status = '52106';
+                    $lotMaster->cur_status = config('payment_lot.status.common.defunct');
                     $lotMaster->save();
                     
                     session()->flash('status', 'Lot ' . $lotNo . ' successfully marked as defunct.');
@@ -439,7 +439,7 @@ middleware(['auth', 'verified']);
                                                         </button>
                                                     @endif
                                                 </div>
-                                                @if(in_array($lot->cur_status, ['52106']))
+                                                @if(in_array($lot->cur_status, [config('payment_lot.status.common.defunct')]))
                                                     <div class="flex items-center justify-between w-40">
                                                         <span class="text-green-600 font-semibold" title="Success Beneficiaries">Success: {{ $lot->success_count ?? 0 }}</span>
                                                         @if(($lot->success_count ?? 0) > 0)

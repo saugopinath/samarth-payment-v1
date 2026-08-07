@@ -167,6 +167,8 @@ class PaymentLotRepository implements PaymentLotRepositoryInterface
 
         $benDetailsQuery = $this->getBaseBeneficiaryQuery($schemeId, $paymentType, $filters, $lotMonth, $financialYear, true);
 
+        $benDetailsQuery->whereNotNull('ben_payment_details.mobile_no');
+
         $this->applyLotControlFilters($benDetailsQuery, $lotMaster);
 
         if (!empty($filters['limit'])) {
@@ -201,12 +203,7 @@ class PaymentLotRepository implements PaymentLotRepositoryInterface
             'ben_count' => count($sbiData),
             'total_amount' => count($sbiData) * $amountRs,
         ]);
-        SbiPaymentLotMasterAdditionalInfo::create([
-                    'lot_no' => $lotMaster->lot_no,
-                    'lot_year' => $lotMaster->lot_year,
-                    'scheme_id' => $lotMaster->scheme_id,
-                    'debit_reference' => $debitReference
-        ]);
+       
     }
 
     /**
@@ -412,14 +409,14 @@ class PaymentLotRepository implements PaymentLotRepositoryInterface
                 ->where('ben_payment_acc_details.is_clean', true);
                 
             if ($includeSelects) {
-                $benDetailsQuery->select('ben_payment_details.ben_id', 'ben_payment_details.ben_name', 'ben_payment_details.created_by_dist_code', 'ben_payment_details.scheme_id', 'ben_payment_acc_details.last_accno as accno', 'ben_payment_acc_details.last_ifsc as ifsc');
+                $benDetailsQuery->select('ben_payment_details.ben_id', 'ben_payment_details.ben_name', 'ben_payment_details.created_by_dist_code', 'ben_payment_details.scheme_id', 'ben_payment_details.mobile_no', 'ben_payment_acc_details.last_accno as accno', 'ben_payment_acc_details.last_ifsc as ifsc');
             }
         } elseif ($paymentType === '5002') {
             $benDetailsQuery->join('ben_payment_abps_details', 'ben_payment_details.ben_id', '=', 'ben_payment_abps_details.ben_id')
                 ->where('ben_payment_abps_details.is_clean', true);
                 
             if ($includeSelects) {
-                $benDetailsQuery->select('ben_payment_details.ben_id', 'ben_payment_details.ben_name', 'ben_payment_details.created_by_dist_code', 'ben_payment_details.scheme_id', 'ben_payment_abps_details.aadhar_no');
+                $benDetailsQuery->select('ben_payment_details.ben_id', 'ben_payment_details.ben_name', 'ben_payment_details.created_by_dist_code', 'ben_payment_details.scheme_id', 'ben_payment_details.mobile_no', 'ben_payment_abps_details.aadhar_no');
             }
         } else {
             throw new \InvalidArgumentException("Invalid payment type: {$paymentType}");
