@@ -81,19 +81,20 @@ middleware(['auth', 'verified']);
                                 $this->payment_type = $monthData['payment_type'];
                             }
 
-                            if (isset($monthData['52301'])) {
-                                $isRegular = $monthData['52301']['is_regular_lot'] ?? false;
-                                $isArrear = $monthData['52301']['is_arrear_lot'] ?? false;
+                            $createOptionCode = config('payment_lot.configuration_codes.create_enable_disable');
+                            if (isset($monthData[$createOptionCode])) {
+                                $isRegular = $monthData[$createOptionCode]['is_regular_lot'] ?? false;
+                                $isArrear = $monthData[$createOptionCode]['is_arrear_lot'] ?? false;
 
                                 $allLotTypes = \App\Models\Codemaster::where('parent_short_code', 'lot_type')->where('is_active', true)->pluck('name', 'code')->toArray();
                                 $validLotTypes = [];
-                                foreach ($allLotTypes as $code => $name) {
-                                    if (stripos($name, 'REGULAR') !== false && $isRegular) {
-                                        $validLotTypes[$code] = $name;
-                                    }
-                                    if ((stripos($name, 'ARREAR') !== false || stripos($name, 'ARRER') !== false) && $isArrear) {
-                                        $validLotTypes[$code] = $name;
-                                    }
+                                $regularLotCode = config('payment_lot.lot_types.regular');
+                                $arrearLotCode = config('payment_lot.lot_types.arrear');
+                                if ($isRegular && isset($allLotTypes[$regularLotCode])) {
+                                    $validLotTypes[$regularLotCode] = $allLotTypes[$regularLotCode];
+                                }
+                                if ($isArrear && isset($allLotTypes[$arrearLotCode])) {
+                                    $validLotTypes[$arrearLotCode] = $allLotTypes[$arrearLotCode];
                                 }
                                 if (count($validLotTypes) === 1) {
                                     $this->lot_type = array_key_first($validLotTypes);
@@ -176,8 +177,9 @@ middleware(['auth', 'verified']);
                         foreach ($allMonths as $code => $displayName) {
                             $monthField = strtolower($code);
                             $monthData = $setting->$monthField;
-                            if (is_array($monthData) && isset($monthData['52301'])) {
-                                if (($monthData['52301']['is_regular_lot'] ?? false) || ($monthData['52301']['is_arrear_lot'] ?? false)) {
+                            $createOptionCode = config('payment_lot.configuration_codes.create_enable_disable');
+                            if (is_array($monthData) && isset($monthData[$createOptionCode])) {
+                                if (($monthData[$createOptionCode]['is_regular_lot'] ?? false) || ($monthData[$createOptionCode]['is_arrear_lot'] ?? false)) {
                                     $months[$code] = $displayName;
                                 }
                             }
@@ -194,17 +196,18 @@ middleware(['auth', 'verified']);
                     if ($setting) {
                         $monthField = strtolower($this->lot_month);
                         $monthData = $setting->$monthField;
-                        if (is_array($monthData) && isset($monthData['52301'])) {
-                            $isRegular = $monthData['52301']['is_regular_lot'] ?? false;
-                            $isArrear = $monthData['52301']['is_arrear_lot'] ?? false;
+                        $createOptionCode = config('payment_lot.configuration_codes.create_enable_disable');
+                        if (is_array($monthData) && isset($monthData[$createOptionCode])) {
+                            $isRegular = $monthData[$createOptionCode]['is_regular_lot'] ?? false;
+                            $isArrear = $monthData[$createOptionCode]['is_arrear_lot'] ?? false;
 
-                            foreach ($allLotTypes as $code => $name) {
-                                if (stripos($name, 'REGULAR') !== false && $isRegular) {
-                                    $lotTypes[$code] = $name;
-                                }
-                                if ((stripos($name, 'ARREAR') !== false || stripos($name, 'ARRER') !== false) && $isArrear) {
-                                    $lotTypes[$code] = $name;
-                                }
+                            $regularLotCode = config('payment_lot.lot_types.regular');
+                            $arrearLotCode = config('payment_lot.lot_types.arrear');
+                            if ($isRegular && isset($allLotTypes[$regularLotCode])) {
+                                $lotTypes[$regularLotCode] = $allLotTypes[$regularLotCode];
+                            }
+                            if ($isArrear && isset($allLotTypes[$arrearLotCode])) {
+                                $lotTypes[$arrearLotCode] = $allLotTypes[$arrearLotCode];
                             }
                         }
                     }
@@ -217,11 +220,9 @@ middleware(['auth', 'verified']);
                 $blockedWardIds = [];
 
                 if ($this->lot_type) {
-                    $selectedLotTypeName = $allLotTypes[$this->lot_type] ?? '';
-                    $blockedColumn = null;
-                    if (stripos($selectedLotTypeName, 'REGULAR') !== false) {
+                    if ($this->lot_type == config('payment_lot.lot_types.regular')) {
                         $blockedColumn = 'allow_regular_lot';
-                    } elseif (stripos($selectedLotTypeName, 'ARREAR') !== false || stripos($selectedLotTypeName, 'ARRER') !== false) {
+                    } elseif ($this->lot_type == config('payment_lot.lot_types.arrear')) {
                         $blockedColumn = 'allow_arrear_lot';
                     }
 
@@ -384,7 +385,7 @@ middleware(['auth', 'verified']);
                     'scheme_id' => $this->scheme,
                     'payment_mode' => $this->target_payment_mode,
                     'lot_type_id' => $this->lot_type,
-                    'cur_status' => config('payment_lot.status.sbi.not_signed'),
+                    'cur_status' => config('payment_lot.status.common.generated'),
                 ]);
 
                 $service = app(\App\Services\PaymentLotService::class);

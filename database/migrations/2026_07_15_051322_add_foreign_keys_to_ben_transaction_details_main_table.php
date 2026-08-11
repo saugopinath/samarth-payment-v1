@@ -37,10 +37,14 @@ return new class extends Migration
         $months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
         $table = 'payment.ben_monthwise_payment_status';
         
-        foreach ($months as $month_item) {
-            DB::statement("ALTER TABLE {$table} DROP CONSTRAINT IF EXISTS fk_ben_monthwise_payment_status_{$month_item}_lot_no");
-            DB::statement("ALTER TABLE {$table} DROP CONSTRAINT IF EXISTS fk_ben_monthwise_payment_status_{$month_item}_lot_type");
-            DB::statement("ALTER TABLE {$table} DROP CONSTRAINT IF EXISTS fk_ben_monthwise_payment_status_{$month_item}_lot_status");
+        try {
+            foreach ($months as $month_item) {
+                DB::statement("ALTER TABLE {$table} DROP CONSTRAINT IF EXISTS fk_ben_monthwise_payment_status_{$month_item}_lot_no");
+                DB::statement("ALTER TABLE {$table} DROP CONSTRAINT IF EXISTS fk_ben_monthwise_payment_status_{$month_item}_lot_type");
+                DB::statement("ALTER TABLE {$table} DROP CONSTRAINT IF EXISTS fk_ben_monthwise_payment_status_{$month_item}_lot_status");
+            }
+        } catch (\Exception $e) {
+            // Ignore if table doesn't exist
         }
     }
 };

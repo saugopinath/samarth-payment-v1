@@ -38,7 +38,7 @@ return new class extends Migration
                 ifsc character(11) COLLATE pg_catalog.\"default\",
                 accno character(20) COLLATE pg_catalog.\"default\",
                 amount_rs numeric(7,0) NOT NULL,
-                status_code smallint,
+                status_code character varying(20),
                 remarks text COLLATE pg_catalog.\"default\",
                 CONSTRAINT pk_transaction_lot_details_lot_scheme PRIMARY KEY (lot_no, lot_year, scheme_id)
             ) PARTITION BY LIST (lot_year);
@@ -65,7 +65,7 @@ return new class extends Migration
         DB::statement("
             ALTER TABLE bandhan.transaction_lot_details
             ADD CONSTRAINT fk_transaction_lot_details_status FOREIGN KEY (status_code)
-            REFERENCES bandhan.codemasters (id) MATCH SIMPLE
+            REFERENCES bandhan.codemasters (code) MATCH SIMPLE
             ON UPDATE NO ACTION
             ON DELETE NO ACTION
         ");

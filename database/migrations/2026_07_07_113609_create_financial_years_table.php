@@ -27,6 +27,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('financial_years');
+        \Illuminate\Support\Facades\DB::statement('DROP TABLE IF EXISTS financial_years CASCADE');
     }
 };

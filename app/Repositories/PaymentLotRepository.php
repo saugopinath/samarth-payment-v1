@@ -16,11 +16,16 @@ class PaymentLotRepository implements PaymentLotRepositoryInterface
      *
      * @var array<string, string>
      */
-    protected array $modeHandlers = [
-        '5201' => 'handleSbiTransactionLot',
-        '5202' => 'handleIfmsTransactionLot',
-        // Add more target payment modes and handlers here as needed
-    ];
+    protected array $modeHandlers = [];
+
+    public function __construct()
+    {
+        $this->modeHandlers = [
+            config('payment_lot.payment_modes.sbi') => 'handleSbiTransactionLot',
+            config('payment_lot.payment_modes.ifms') => 'handleIfmsTransactionLot',
+            // Add more target payment modes and handlers here as needed
+        ];
+    }
 
     /**
      * Generate the transaction lot records for the given payment mode.
@@ -105,9 +110,9 @@ class PaymentLotRepository implements PaymentLotRepositoryInterface
                 'scheme_id' => $schemeId,
                 'ben_id' => $ben->ben_id,
                 'ben_name' => $ben->ben_name,
-                'ifsc' => $paymentType === '5001' ? ($ben->ifsc ?? null) : null,
-                'accno' => $paymentType === '5001' ? ($ben->accno ?? null) : null,
-                'aadhar_no' => $paymentType === '5002' ? (($aadharType ?? 'raw') === 'token' ? ($ben->aadhar_token ?? null) : ($ben->aadhar_no ?? null)) : null,
+                'ifsc' => $paymentType == config('payment_lot.payment_types.acc_base') ? ($ben->ifsc ?? null) : null,
+                'accno' => $paymentType == config('payment_lot.payment_types.acc_base') ? ($ben->accno ?? null) : null,
+                'aadhar_no' => $paymentType == config('payment_lot.payment_types.abps_base') ? (($aadharType ?? 'raw') === 'token' ? ($ben->aadhar_token ?? null) : ($ben->aadhar_no ?? null)) : null,
                 'amount_rs' => $amountRs,
                 'debit_reference' => $debitReference,
                 'agency_cr_ref' => $ben->created_by_dist_code . $ben->scheme_id . $ben->ben_id,
@@ -185,9 +190,9 @@ class PaymentLotRepository implements PaymentLotRepositoryInterface
                 'scheme_id' => $schemeId,
                 'ben_id' => $ben->ben_id,
                 'ben_name' => $ben->ben_name,
-                'ifsc' => $paymentType === '5001' ? ($ben->ifsc ?? null) : null,
-                'accno' => $paymentType === '5001' ? ($ben->accno ?? null) : null,
-                'aadhar_no' => $paymentType === '5002' ? (($aadharType ?? 'raw') === 'token' ? ($ben->aadhar_token ?? null) : ($ben->aadhar_no ?? null)) : null,
+                'ifsc' => $paymentType == config('payment_lot.payment_types.acc_base') ? ($ben->ifsc ?? null) : null,
+                'accno' => $paymentType == config('payment_lot.payment_types.acc_base') ? ($ben->accno ?? null) : null,
+                'aadhar_no' => $paymentType == config('payment_lot.payment_types.abps_base') ? (($aadharType ?? 'raw') === 'token' ? ($ben->aadhar_token ?? null) : ($ben->aadhar_no ?? null)) : null,
                 'amount_rs' => $amountRs,
                 'pension_id' => $ben->scheme_id,
                 'unique_id' => $ben->created_by_dist_code . $ben->scheme_id . $ben->ben_id,
@@ -215,8 +220,8 @@ class PaymentLotRepository implements PaymentLotRepositoryInterface
      */
     protected function applyLotControlFilters($query, PaymentLotMaster $lotMaster): void
     {
-        $isRegular = $lotMaster->lot_type_id === '52301';
-        $isArrear = $lotMaster->lot_type_id === '52302';
+        $isRegular = $lotMaster->lot_type_id == config('payment_lot.lot_types.regular');
+        $isArrear = $lotMaster->lot_type_id == config('payment_lot.lot_types.arrear');
         
         $blockedColumn = $isRegular ? 'allow_regular_lot' : ($isArrear ? 'allow_arrear_lot' : null);
 
@@ -295,8 +300,8 @@ class PaymentLotRepository implements PaymentLotRepositoryInterface
         $benDetailsQuery = $this->getBaseBeneficiaryQuery($schemeId, $paymentType, $filters, $lotMonth, $financialYear, false);
 
         // Apply Lot Control Filters manually without a PaymentLotMaster model instance
-        $isRegular = $lotTypeId === '52301';
-        $isArrear = $lotTypeId === '52302';
+        $isRegular = $lotTypeId == config('payment_lot.lot_types.regular');
+        $isArrear = $lotTypeId == config('payment_lot.lot_types.arrear');
         
         $blockedColumn = $isRegular ? 'allow_regular_lot' : ($isArrear ? 'allow_arrear_lot' : null);
 
@@ -381,7 +386,7 @@ class PaymentLotRepository implements PaymentLotRepositoryInterface
                 $join->on('ben_payment_details.ben_id', '=', 'ben_monthwise_payment_status.ben_id')
                      ->where('ben_monthwise_payment_status.financial_year', $financialYear)
                      ->where('ben_monthwise_payment_status.scheme_id', $schemeId)
-                     ->where("ben_monthwise_payment_status.{$monthPrefix}_lot_status", 52101)
+                     ->where("ben_monthwise_payment_status.{$monthPrefix}_lot_status", config('payment_lot.status.common.not_generated'))
                      ->where("ben_monthwise_payment_status.{$monthPrefix}_is_eligible", true);
             });
 
@@ -404,14 +409,14 @@ class PaymentLotRepository implements PaymentLotRepositoryInterface
             $benDetailsQuery->where('ben_payment_details.ward_code', $filters['ward_id']);
         }
 
-        if ($paymentType === '5001') {
+        if ($paymentType == config('payment_lot.payment_types.acc_base')) {
             $benDetailsQuery->join('ben_payment_acc_details', 'ben_payment_details.ben_id', '=', 'ben_payment_acc_details.ben_id')
                 ->where('ben_payment_acc_details.is_clean', true);
                 
             if ($includeSelects) {
                 $benDetailsQuery->select('ben_payment_details.ben_id', 'ben_payment_details.ben_name', 'ben_payment_details.created_by_dist_code', 'ben_payment_details.scheme_id', 'ben_payment_details.mobile_no', 'ben_payment_acc_details.last_accno as accno', 'ben_payment_acc_details.last_ifsc as ifsc');
             }
-        } elseif ($paymentType === '5002') {
+        } elseif ($paymentType == config('payment_lot.payment_types.abps_base')) {
             $benDetailsQuery->join('ben_payment_abps_details', 'ben_payment_details.ben_id', '=', 'ben_payment_abps_details.ben_id')
                 ->where('ben_payment_abps_details.is_clean', true);
                 

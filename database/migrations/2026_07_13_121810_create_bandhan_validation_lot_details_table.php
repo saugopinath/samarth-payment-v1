@@ -39,9 +39,10 @@ return new class extends Migration
                 status_code varchar(5) NULL,
                 misc int2 NULL,
                 av_ds_phase int2 NULL,
-                av_account_status smallint NULL,
+                av_account_status character varying(20) NULL,
                 name_status bpchar(1) NULL,
-                name_status_code smallint NULL,
+                name_status_code character varying(20) NULL,
+                name_matching_score smallint NULL,
                 name_response varchar(200) NULL,
                 aaadhar_no bpchar(12) NULL,
 

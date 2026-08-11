@@ -74,7 +74,7 @@ return new class extends Migration
         DB::statement("
             ALTER TABLE sbi.transaction_lot_details
             ADD CONSTRAINT fk_transaction_lot_details_status_sbi FOREIGN KEY (status_code)
-            REFERENCES sbi.codemasters (id) MATCH SIMPLE
+            REFERENCES sbi.codemasters (code) MATCH SIMPLE
             ON UPDATE NO ACTION
             ON DELETE NO ACTION
         ");

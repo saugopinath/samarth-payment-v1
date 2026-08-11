@@ -175,7 +175,8 @@ class SbiSftpIntegrationService implements PaymentIntegrationInterface
         $file_content = file_get_contents(storage_path('app/sbi/ePay/ToProcess/' . $file_name));
         $encryptedFile = SBIEncryptDecrypt::file_encrypt($file_content, $this->enc_publickey);
         file_put_contents(storage_path('app/sbi/ePay/ToProcessEnc/' . $file_name), $encryptedFile);
-
+        $lotMaster->cur_status = config('payment_lot.status.sbi.ack'); // GENERATED,PUSHED AND RESPONSE RECEIVED
+        $lotMaster->save();
         return [
             'unsigned' => $unsigned_xml_file,
             'signed' => $signed_xml_file,
@@ -204,6 +205,7 @@ class SbiSftpIntegrationService implements PaymentIntegrationInterface
               $encryptedAck = SBIEncryptDecrypt::file_encrypt($ack_xml, $this->enc_publickey);
               Storage::disk($this->sbi_sftp_server)->put('ePay/Acknowledgement/' . $debitRef . '_ACK.xml', $encryptedAck);
           }
+          
     }
 
     public function checkAcknowledge(PaymentLotMaster $lotMaster)
@@ -226,7 +228,7 @@ class SbiSftpIntegrationService implements PaymentIntegrationInterface
             $file_ack_status_code = (string) $remote_xml_file->DEBIT_ACCOUNT['ACK_STATUS_CODE'];
             
             if ($file_ack_status_code == '000') {
-                $lotMaster->cur_status = '52105'; // GENERATED,PUSHED AND RESPONSE RECEIVED
+                $lotMaster->cur_status = config('payment_lot.status.common.ack'); // GENERATED,PUSHED AND RESPONSE RECEIVED
                 $lotMaster->response_receive_date = now();
                 $lotMaster->save();
 
@@ -377,7 +379,7 @@ class SbiSftpIntegrationService implements PaymentIntegrationInterface
                     $lotMaster->success_amount = $successAmount;
                     $lotMaster->failed_amount = $failedAmount;
                     // If everything is processed, you might want a distinct status for it. Here we keep it as 52105 or update it to something else
-                    $lotMaster->cur_status = '52106'; // Keep or change based on your workflow
+                    $lotMaster->cur_status = config('payment_lot.status.common.response'); // Keep or change based on your workflow
                     $lotMaster->save();
 
                     return [
