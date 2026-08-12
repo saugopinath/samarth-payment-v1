@@ -4,9 +4,9 @@ namespace App\Services\Integration\Bandhan;
 
 use App\Models\PaymentLotMaster;
 use App\Models\SbiPaymentLotMasterAdditionalInfo;
-use App\Services\Contracts\PaymentIntegrationInterface;
+use App\Services\Contracts\PaymentSBIIntegrationInterface;
 
-class BandhanApiIntegrationService implements PaymentIntegrationInterface
+class BandhanApiIntegrationService implements PaymentSBIIntegrationInterface
 {
     private static $instance = null;
 

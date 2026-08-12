@@ -4,9 +4,9 @@ namespace App\Services\Integration\IFMS;
 
 use App\Models\PaymentLotMaster;
 use App\Models\SbiPaymentLotMasterAdditionalInfo;
-use App\Services\Contracts\PaymentIntegrationInterface;
+use App\Services\Contracts\PaymentSBIIntegrationInterface;
 
-class IfmsSftpIntegrationService implements PaymentIntegrationInterface
+class IfmsSftpIntegrationService implements PaymentSBIIntegrationInterface
 {
     private static $instance = null;
 

@@ -9,11 +9,11 @@ use Exception;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\File;
 use App\Models\SbiPaymentLotMasterAdditionalInfo;
-use App\Services\Contracts\PaymentIntegrationInterface;
+use App\Services\Contracts\PaymentSBIIntegrationInterface;
 use App\Helpers\XmlSigner;
 use App\Helpers\SBIEncryptDecrypt;
 
-class SbiSftpIntegrationService implements PaymentIntegrationInterface
+class SbiSftpIntegrationService implements PaymentSBIIntegrationInterface
 {
     private static $instance = null;
     
@@ -175,7 +175,9 @@ class SbiSftpIntegrationService implements PaymentIntegrationInterface
         $file_content = file_get_contents(storage_path('app/sbi/ePay/ToProcess/' . $file_name));
         $encryptedFile = SBIEncryptDecrypt::file_encrypt($file_content, $this->enc_publickey);
         file_put_contents(storage_path('app/sbi/ePay/ToProcessEnc/' . $file_name), $encryptedFile);
-        $lotMaster->cur_status = config('payment_lot.status.sbi.ack'); // GENERATED,PUSHED AND RESPONSE RECEIVED
+       // dd(config('payment_lot.status.sbi.signed'));
+        $lotMaster->cur_status = config('payment_lot.status.sbi.signed'); // GENERATED,PUSHED AND RESPONSE RECEIVED
+       // dd($lotMaster->cur_status);
         $lotMaster->save();
         return [
             'unsigned' => $unsigned_xml_file,
@@ -326,6 +328,10 @@ class SbiSftpIntegrationService implements PaymentIntegrationInterface
                     $successAmount = 0;
                     $failedAmount = 0;
 
+                    $codemasterChilds = collect(config('codemaster.childs'));
+                    $failedTypeCode = $codemasterChilds->where('short_name', 'payment_failed')->first()['code'] ?? '1415';
+                    $sbiSourceCode = $codemasterChilds->where('short_name', 'sbi')->first()['code'] ?? '5201';
+
                     // Loop through CREDITACCOUNTS
                     if (isset($remote_xml_file->CREDITACCOUNTS->CREDIT_ACCOUNT)) {
                         foreach ($remote_xml_file->CREDITACCOUNTS->CREDIT_ACCOUNT as $credit_account) {
@@ -366,8 +372,8 @@ class SbiSftpIntegrationService implements PaymentIntegrationInterface
                                         'scheme_id' => $lotMaster->scheme_id,
                                         'status_code' => $mapped_status_code,
                                         'remarks' => $credit_remarks,
-                                        'failed_type' => '1415',
-                                        'failed_source' => '5201'
+                                        'failed_type' => $failedTypeCode,
+                                        'failed_source' => $sbiSourceCode
                                     ]);
                                 }
                             }

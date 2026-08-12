@@ -18,7 +18,7 @@ class PaymentIntegrationFactory
     /**
      * Factory method to return the correct integration strategy (SFTP or API).
      */
-    public static function make($lotNo): \App\Services\Contracts\PaymentIntegrationInterface
+    public static function make($lotNo): \App\Services\Contracts\PaymentSBIIntegrationInterface
     {
         $lotMaster = PaymentLotMaster::where('lot_no', $lotNo)->firstOrFail();
         

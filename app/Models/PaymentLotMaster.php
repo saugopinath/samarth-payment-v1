@@ -18,6 +18,20 @@ class PaymentLotMaster extends Model implements Auditable
     protected $keyType = 'int';
     public $incrementing = true;
     protected $guarded = [];
+    protected $fillable = [
+		'lot_month',
+		'lot_year',
+		'scheme_id',
+		'payment_mode',
+		'lot_type_id',
+        'ben_count',
+        'total_amount',
+        'success_count',
+        'failed_count',
+        'success_amount',
+        'failed_amount',
+		'cur_status'
+	];
 
     public function sbiPaymentLotMasterAdditionalInfo()
     {

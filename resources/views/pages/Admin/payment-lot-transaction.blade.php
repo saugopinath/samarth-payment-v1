@@ -154,10 +154,8 @@ middleware(['auth', 'verified']);
                     $lotMaster = \App\Models\PaymentLotMaster::where('lot_no', $lotNo)->firstOrFail();
                     $result = $service->preparePayload($lotMaster);
                     
-                    $lotMaster->cur_status = config('payment_lot.status.sbi.generated_and_signed');
-                    $lotMaster->save();
-                    
                     session()->flash('status', 'Lot ' . $lotNo . ' successfully signed.');
+                    $this->search();
                 } catch (\Exception $e) {
                     session()->flash('status', 'Error signing lot ' . $lotNo . ': ' . $e->getMessage());
                 }
@@ -173,7 +171,7 @@ middleware(['auth', 'verified']);
                      $service = \App\Services\Integration\PaymentIntegrationFactory::make($lotNo);
                      $service->pushToTarget($lotMaster_add);
 
-                    $lotMaster->cur_status = config('payment_lot.status.sbi.generated_and_pushed');
+                    $lotMaster->cur_status = config('payment_lot.status.common.push');
                     $lotMaster->save();
                     
                     session()->flash('status', 'Lot ' . $lotNo . ' successfully pushed to target.');
@@ -439,7 +437,7 @@ middleware(['auth', 'verified']);
                                                         </button>
                                                     @endif
                                                 </div>
-                                                @if(in_array($lot->cur_status, [config('payment_lot.status.common.defunct')]))
+                                                @if(in_array($lot->cur_status, [config('payment_lot.status.common.response')]))
                                                     <div class="flex items-center justify-between w-40">
                                                         <span class="text-green-600 font-semibold" title="Success Beneficiaries">Success: {{ $lot->success_count ?? 0 }}</span>
                                                         @if(($lot->success_count ?? 0) > 0)
