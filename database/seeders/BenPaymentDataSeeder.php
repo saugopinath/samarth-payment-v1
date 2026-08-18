@@ -61,6 +61,7 @@ class BenPaymentDataSeeder extends Seeder
                         'last_ifsc' => $ifsc,
                         'npci_bank_code' => $npci,
                         'aadhar_no' => $aadharNo,
+                        'mobile_no' => $faker->numerify('##########'),
                         'is_eligible' => true,
                         'created_by_dist_code' => $block->district_id ?? 1, // Removed clone, primitive integer
                         'created_by_sdo_code' => 0, // Fallback for blocks
@@ -109,6 +110,7 @@ class BenPaymentDataSeeder extends Seeder
                         'last_ifsc' => $ifsc,
                         'npci_bank_code' => $npci,
                         'aadhar_no' => $aadharNo,
+                        'mobile_no' => $faker->numerify('##########'),
                         'is_eligible' => true,
                         'created_by_dist_code' => $subdivision->district_id ?? 1,
                         'created_by_sdo_code' => $subdivision->id ?? 1,

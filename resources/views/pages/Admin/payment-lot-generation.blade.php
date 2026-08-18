@@ -379,35 +379,41 @@ middleware(['auth', 'verified']);
                     'target_payment_mode.required' => 'Target Payment Mode is required.',
                 ]);
 
-                $lotMaster = \App\Models\PaymentLotMaster::create([
-                    'lot_month' => $this->lot_month,
-                    'lot_year' => $this->lot_financial_year,
-                    'scheme_id' => $this->scheme,
-                    'payment_mode' => $this->target_payment_mode,
-                    'lot_type_id' => $this->lot_type,
-                    'cur_status' => config('payment_lot.status.common.generated'),
-                ]);
+               
+                    $lotMaster = \App\Models\PaymentLotMaster::create([
+                        'lot_month' => $this->lot_month,
+                        'lot_year' => $this->lot_financial_year,
+                        'scheme_id' => $this->scheme,
+                        'payment_mode' => $this->target_payment_mode,
+                        'lot_type_id' => $this->lot_type,
+                        'cur_status' => config('payment_lot.status.common.generated'),
+                    ]);
 
-                $service = app(\App\Services\PaymentLotService::class);
-                $filters = [
-                    'district_id' => $this->district_id ? District::find($this->district_id)?->lgd_code : null,
-                    'rural_urban_id' => $this->rural_urban,
-                    'block_id' => $this->block_id ? Block::find($this->block_id)?->lgd_code : null,
-                    'municipality_id' => $this->municipality_id ? Municipality::find($this->municipality_id)?->lgd_code : null,
-                    'gp_id' => $this->gp_id ? Panchayat::find($this->gp_id)?->lgd_code : null,
-                    'ward_id' => $this->ward_id ? Ward::find($this->ward_id)?->lgd_code : null,
-                    'limit' => $this->limit ?: null,
-                ];
+                    $service = app(\App\Services\PaymentLotService::class);
+                    $filters = [
+                        'district_id' => $this->district_id ? District::find($this->district_id)?->lgd_code : null,
+                        'rural_urban_id' => $this->rural_urban,
+                        'block_id' => $this->block_id ? Block::find($this->block_id)?->lgd_code : null,
+                        'municipality_id' => $this->municipality_id ? Municipality::find($this->municipality_id)?->lgd_code : null,
+                        'gp_id' => $this->gp_id ? Panchayat::find($this->gp_id)?->lgd_code : null,
+                        'ward_id' => $this->ward_id ? Ward::find($this->ward_id)?->lgd_code : null,
+                        'limit' => $this->limit ?: null,
+                    ];
 
-                $service->generateTransactionLot(
-                    $lotMaster,
-                    (int) $this->scheme,
-                    $this->lot_financial_year,
-                    $this->lot_month,
-                    $this->payment_type ?? '',
-                    $this->target_payment_mode,
-                    $filters
-                );
+                    $success = $service->generateTransactionLot(
+                        $lotMaster,
+                        (int) $this->scheme,
+                        $this->lot_financial_year,
+                        $this->lot_month,
+                        $this->payment_type ?? '',
+                        $this->target_payment_mode,
+                        $filters
+                    );
+                    //dd($success,'success');
+
+                    if (!$success) {
+                        throw new \Exception("Failed to generate transaction lot records completely.");
+                    }
 
                 $lotNo = $lotMaster->lot_no;
 

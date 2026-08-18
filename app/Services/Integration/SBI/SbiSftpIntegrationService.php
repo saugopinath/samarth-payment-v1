@@ -185,9 +185,9 @@ class SbiSftpIntegrationService implements PaymentSBIIntegrationInterface
             'encrypted' => storage_path('app/sbi/ePay/ToProcessEnc/' . $file_name)
         ];
     }
-    public function pushToTarget(SbiPaymentLotMasterAdditionalInfo $lotMasterAdd)
+    public function pushToTarget(PaymentLotMaster $lotMaster)
     {
-          $debitRef = trim($lotMasterAdd->debit_reference);
+          $debitRef = trim($lotMaster->sbiPaymentLotMasterAdditionalInfo->debit_reference);
           $file_name = $debitRef.'.xml';
           $storagePath = 'app/sbi/ePay/ToProcess/'.$file_name;
           $storagePathEnc = 'app/sbi/ePay/ToProcessEnc/'.$file_name;
@@ -196,6 +196,16 @@ class SbiSftpIntegrationService implements PaymentSBIIntegrationInterface
           $remotePath = app()->environment('production') ? 'ePay/ToProcess/' : 'ePay/Test/ToProcess/';
           
           Storage::disk($this->sbi_sftp_server)->put($remotePath . $file_name, $payment_file_content);
+
+          $additionalInfo = $lotMaster->sbiPaymentLotMasterAdditionalInfo;
+          if ($additionalInfo) {
+              $additionalInfo->tran_date = date('dmY');
+              $additionalInfo->save();
+          }
+
+          $lotMaster->cur_status = config('payment_lot.status.common.push');
+          $lotMaster->payment_push_date = now();
+          $lotMaster->save();
 
           if (app()->environment('local')) {
               $ack_xml = '<?xml version="1.0" encoding="utf-8" standalone="no"?>

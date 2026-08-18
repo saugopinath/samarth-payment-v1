@@ -165,14 +165,11 @@ middleware(['auth', 'verified']);
                 try {
                     $lotMaster = \App\Models\PaymentLotMaster::where('lot_no', $lotNo)->firstOrFail();
 
-                    $lotMaster_add = \App\Models\SbiPaymentLotMasterAdditionalInfo::where('lot_no', $lotNo)->firstOrFail();
-                    
                     // TODO: Implement actual SFTP/API push logic to SBI here
                      $service = \App\Services\Integration\PaymentIntegrationFactory::make($lotNo);
-                     $service->pushToTarget($lotMaster_add);
+                     $service->pushToTarget($lotMaster);
 
-                    $lotMaster->cur_status = config('payment_lot.status.common.push');
-                    $lotMaster->save();
+
                     
                     session()->flash('status', 'Lot ' . $lotNo . ' successfully pushed to target.');
                     $this->search();
@@ -184,7 +181,6 @@ middleware(['auth', 'verified']);
             $checkAcknowledge = function ($lotNo) {
                 try {
                     $lotMaster = \App\Models\PaymentLotMaster::where('lot_no', $lotNo)->firstOrFail();
-                    $lotMaster_add = \App\Models\SbiPaymentLotMasterAdditionalInfo::where('lot_no', $lotNo)->firstOrFail();
                     
                     $service = \App\Services\Integration\PaymentIntegrationFactory::make($lotNo);
                     $result = $service->checkAcknowledge($lotMaster);
@@ -204,7 +200,6 @@ middleware(['auth', 'verified']);
             $checkResponse = function ($lotNo) {
                 try {
                     $lotMaster = \App\Models\PaymentLotMaster::where('lot_no', $lotNo)->firstOrFail();
-                    $lotMaster_add = \App\Models\SbiPaymentLotMasterAdditionalInfo::where('lot_no', $lotNo)->firstOrFail();
                     
                     $service = \App\Services\Integration\PaymentIntegrationFactory::make($lotNo);
                     $result = $service->checkResponse($lotMaster);

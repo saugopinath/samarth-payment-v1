@@ -52,7 +52,9 @@ return new class extends Migration
                 ifms_wrongdata_count int4 NULL,
                 rbi_failed_count int4 NULL,
                 rbi_success_count int4 NULL,
-                CONSTRAINT pk_transaction_lot_details_lot_scheme_ifms PRIMARY KEY (lot_no, lot_year, scheme_id)
+                created_at timestamp without time zone,
+                updated_at timestamp without time zone,
+                CONSTRAINT pk_transaction_lot_details_lot_scheme_ifms PRIMARY KEY (lot_no, lot_year, scheme_id,ben_id)
             ) PARTITION BY LIST (lot_year);
         ");
 

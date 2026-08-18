@@ -42,6 +42,7 @@ class DatabaseSeeder extends Seeder
             DsPhaseSeeder::class,
             FinancialYearSeeder::class,
             MonthSeeder::class,
+            BenPaymentDataSeeder::class,
 
 
         ]);

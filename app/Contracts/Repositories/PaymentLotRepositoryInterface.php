@@ -26,7 +26,7 @@ interface PaymentLotRepositoryInterface
         string $paymentType,
         string $targetPaymentMode,
         array $filters = []
-    ): void;
+    ): bool;
 
     /**
      * Preview the transaction lot records for the given criteria.

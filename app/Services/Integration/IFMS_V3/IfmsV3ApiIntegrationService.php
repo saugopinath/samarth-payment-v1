@@ -24,12 +24,12 @@ class IfmsV3ApiIntegrationService implements PaymentSBIIntegrationInterface
         return true;
     }
 
-    public function pushToTarget(SbiPaymentLotMasterAdditionalInfo $lotMasterAdd)
+    public function pushToTarget(PaymentLotMaster $lotMaster)
     {
         // TODO: Implement IFMS V3 API push
         return [
             'status' => 1,
-            'msg' => 'IFMS V3 API push not yet implemented for Lot - ' . $lotMasterAdd->lot_no,
+            'msg' => 'IFMS V3 API push not yet implemented for Lot - ' . $lotMaster->lot_no,
             'type' => 'blue'
         ];
     }
@@ -54,3 +54,4 @@ class IfmsV3ApiIntegrationService implements PaymentSBIIntegrationInterface
         ];
     }
 }
+

@@ -7,6 +7,7 @@ use App\Models\PaymentLotMaster;
 use App\Models\PaymentMainSetting;
 use App\Models\BenPaymentDetail;
 use App\Models\SbiTransactionLotDetail;
+use App\Models\IfmsTransactionLotDetail;
 use App\Models\SbiPaymentLotMasterAdditionalInfo;
 
 class PaymentLotRepository implements PaymentLotRepositoryInterface
@@ -47,13 +48,13 @@ class PaymentLotRepository implements PaymentLotRepositoryInterface
         string $paymentType,
         string $targetPaymentMode,
         array $filters = []
-    ): void {
+    ): bool {
         if (!isset($this->modeHandlers[$targetPaymentMode])) {
-            return; // Or throw an exception for unsupported mode
+            return false; // Or throw an exception for unsupported mode
         }
 
         $handler = $this->modeHandlers[$targetPaymentMode];
-        $this->$handler($lotMaster, $schemeId, $financialYear, $lotMonth, $paymentType, $filters);
+        return $this->$handler($lotMaster, $schemeId, $financialYear, $lotMonth, $paymentType, $filters);
     }
 
     /**
@@ -74,7 +75,7 @@ class PaymentLotRepository implements PaymentLotRepositoryInterface
         string $lotMonth,
         string $paymentType,
         array $filters = []
-    ): void {
+    ): bool {
         $amountRs = 0;
         $setting = PaymentMainSetting::where('scheme_id', $schemeId)
             ->where('financial_year', $financialYear)
@@ -119,20 +120,49 @@ class PaymentLotRepository implements PaymentLotRepositoryInterface
             ];
         }
 
-        foreach (array_chunk($sbiData, 500) as $chunk) {
-            SbiTransactionLotDetail::insert($chunk);
-        }
+        \Illuminate\Support\Facades\DB::connection('pgsql_sbi')->beginTransaction();
+        \Illuminate\Support\Facades\DB::connection('pgsql_payment')->beginTransaction();
 
-        $lotMaster->update([
-            'ben_count' => count($sbiData),
-            'total_amount' => count($sbiData) * $amountRs,
-        ]);
-        SbiPaymentLotMasterAdditionalInfo::create([
-                    'lot_no' => $lotMaster->lot_no,
-                    'lot_year' => $lotMaster->lot_year,
-                    'scheme_id' => $lotMaster->scheme_id,
-                    'debit_reference' => $debitReference
-        ]);
+        try {
+            $insertedCount = 0;
+            foreach ($sbiData as $data) {
+                $detail = SbiTransactionLotDetail::create($data);
+                if ($detail) {
+                    $insertedCount++;
+                }
+            }
+
+            if ($insertedCount == count($sbiData)) {
+                $lotMaster->update([
+                    'ben_count' => count($sbiData),
+                    'total_amount' => count($sbiData) * $amountRs,
+                ]);
+                SbiPaymentLotMasterAdditionalInfo::create([
+                            'lot_no' => $lotMaster->lot_no,
+                            'lot_year' => $lotMaster->lot_year,
+                            'scheme_id' => $lotMaster->scheme_id,
+                            'debit_reference' => $debitReference
+                ]);
+                
+                if ($this->updateMonthwiseStatus($sbiData, $lotMaster, $lotMonth, $financialYear, $schemeId)) {
+                    \Illuminate\Support\Facades\DB::connection('pgsql_sbi')->commit();
+                    \Illuminate\Support\Facades\DB::connection('pgsql_payment')->commit();
+                    return true;
+                } else {
+                    \Illuminate\Support\Facades\DB::connection('pgsql_sbi')->rollBack();
+                    \Illuminate\Support\Facades\DB::connection('pgsql_payment')->rollBack();
+                    return false;
+                }
+            } else {
+                \Illuminate\Support\Facades\DB::connection('pgsql_sbi')->rollBack();
+                \Illuminate\Support\Facades\DB::connection('pgsql_payment')->rollBack();
+                return false;
+            }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\DB::connection('pgsql_sbi')->rollBack();
+            \Illuminate\Support\Facades\DB::connection('pgsql_payment')->rollBack();
+            throw $e;
+        }
     }
 
         /**
@@ -153,7 +183,7 @@ class PaymentLotRepository implements PaymentLotRepositoryInterface
         string $lotMonth,
         string $paymentType,
         array $filters = []
-    ): void {
+    ): bool {
         $amountRs = 0;
         $setting = PaymentMainSetting::where('scheme_id', $schemeId)
             ->where('financial_year', $financialYear)
@@ -181,6 +211,7 @@ class PaymentLotRepository implements PaymentLotRepositoryInterface
         }
 
         $benDetails = $benDetailsQuery->get();
+       // dd($benDetails);
         $sbiData = [];
 
         foreach ($benDetails as $ben) {
@@ -200,15 +231,44 @@ class PaymentLotRepository implements PaymentLotRepositoryInterface
             ];
         }
 
-        foreach (array_chunk($sbiData, 500) as $chunk) {
-            IfmsTransactionLotDetail::insert($chunk);
-        }
+        \Illuminate\Support\Facades\DB::connection('pgsql_ifms')->beginTransaction();
+        \Illuminate\Support\Facades\DB::connection('pgsql_payment')->beginTransaction();
 
-        $lotMaster->update([
-            'ben_count' => count($sbiData),
-            'total_amount' => count($sbiData) * $amountRs,
-        ]);
-       
+        try {
+            $insertedCount = 0;
+            foreach ($sbiData as $data) {
+                $detail = IfmsTransactionLotDetail::create($data);
+               // dd($detail);
+                if ($detail) {
+                    $insertedCount++;
+                }
+            }
+
+            if ($insertedCount == count($sbiData)) {
+                $lotMaster->update([
+                    'ben_count' => count($sbiData),
+                    'total_amount' => count($sbiData) * $amountRs,
+                ]);
+                
+                if ($this->updateMonthwiseStatus($sbiData, $lotMaster, $lotMonth, $financialYear, $schemeId)) {
+                    \Illuminate\Support\Facades\DB::connection('pgsql_ifms')->commit();
+                    \Illuminate\Support\Facades\DB::connection('pgsql_payment')->commit();
+                    return true;
+                } else {
+                    \Illuminate\Support\Facades\DB::connection('pgsql_ifms')->rollBack();
+                    \Illuminate\Support\Facades\DB::connection('pgsql_payment')->rollBack();
+                    return false;
+                }
+            } else {
+                \Illuminate\Support\Facades\DB::connection('pgsql_ifms')->rollBack();
+                \Illuminate\Support\Facades\DB::connection('pgsql_payment')->rollBack();
+                return false;
+            }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\DB::connection('pgsql_ifms')->rollBack();
+            \Illuminate\Support\Facades\DB::connection('pgsql_payment')->rollBack();
+            throw $e;
+        }
     }
 
     /**
@@ -428,5 +488,28 @@ class PaymentLotRepository implements PaymentLotRepositoryInterface
         }
 
         return $benDetailsQuery;
+    }
+
+    /**
+     * Updates BenMonthwisePaymentStatus for the generated lot.
+     */
+    protected function updateMonthwiseStatus(array $data, PaymentLotMaster $lotMaster, string $lotMonth, string $financialYear, int $schemeId): bool
+    {
+        $benIds = array_column($data, 'ben_id');
+        if (empty($benIds)) {
+            return true;
+        }
+
+        $monthPrefix = strtolower(substr($lotMonth, 0, 3));
+        $updated = \App\Models\BenMonthwisePaymentStatus::whereIn('ben_id', $benIds)
+            ->where('scheme_id', $schemeId)
+            ->where('financial_year', $financialYear)
+            ->update([
+                "{$monthPrefix}_lot_no" => $lotMaster->lot_no,
+                "{$monthPrefix}_lot_type" => $lotMaster->lot_type_id,
+                "{$monthPrefix}_lot_status" => $lotMaster->cur_status
+            ]);
+
+        return $updated === count($benIds);
     }
 }

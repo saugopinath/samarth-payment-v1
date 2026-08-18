@@ -15,7 +15,7 @@ interface PaymentSBIIntegrationInterface
     /**
      * Push the prepared payload to the target system (e.g., via SFTP or API).
      */
-    public function pushToTarget(SbiPaymentLotMasterAdditionalInfo $lotMasterAdd);
+    public function pushToTarget(PaymentLotMaster $lotMaster);
 
     /**
      * Check the acknowledgment status from the target system.

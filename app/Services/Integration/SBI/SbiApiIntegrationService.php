@@ -26,12 +26,12 @@ class SbiApiIntegrationService implements PaymentSBIIntegrationInterface
         return true;
     }
 
-    public function pushToTarget(SbiPaymentLotMasterAdditionalInfo $lotMasterAdd)
+    public function pushToTarget(PaymentLotMaster $lotMaster)
     {
         // TODO: Implement actual API HTTP POST logic for pushing to SBI
         return [
             'status' => 1,
-            'msg' => 'API Base logic for push not yet implemented for Lot - ' . $lotMasterAdd->lot_no,
+            'msg' => 'API Base logic for push not yet implemented for Lot - ' . $lotMaster->lot_no,
             'type' => 'blue'
         ];
     }
@@ -56,3 +56,4 @@ class SbiApiIntegrationService implements PaymentSBIIntegrationInterface
         ];
     }
 }
+

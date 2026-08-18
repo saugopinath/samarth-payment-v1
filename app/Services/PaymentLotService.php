@@ -34,8 +34,8 @@ class PaymentLotService
         string $paymentType,
         string $targetPaymentMode,
         array $filters = []
-    ): void {
-        $this->paymentLotRepository->generateTransactionLot(
+    ): bool {
+        return $this->paymentLotRepository->generateTransactionLot(
             $lotMaster,
             $schemeId,
             $financialYear,

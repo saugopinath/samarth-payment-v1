@@ -14,7 +14,24 @@ class SbiTransactionLotDetail extends Model implements Auditable
      use AuditableTrait;
     protected $connection = 'pgsql_sbi';
     protected $table = 'sbi.transaction_lot_details';
-    protected $guarded = [];
-
+    protected $fillable = [
+        'lot_no',
+        'lot_year',
+        'scheme_id',
+        'ben_id',
+        'ben_name',
+        'ifsc',
+        'accno',
+        'aadhar_no',
+        'amount_rs',
+        'status_code',
+        'remarks',
+        'debit_reference',
+        'credit_reference',
+        'npci_user_id',
+        'npci_user_name',
+        'agency_cr_ref',
+        'credit_payment_reference'
+    ];
     //
 }
