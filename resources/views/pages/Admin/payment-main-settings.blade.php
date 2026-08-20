@@ -85,6 +85,8 @@ middleware(['auth', 'verified']);
                         $this->settings[$colName]['payment_type'] = $monthData['payment_type'] ?? '';
                         $this->settings[$colName]['aadhar_type'] = $monthData['aadhar_type'] ?? '';
                         $this->settings[$colName]['integration_type'] = $monthData['integration_type'] ?? '';
+                        $this->settings[$colName]['party_code'] = $monthData['party_code'] ?? '';
+                        $this->settings[$colName]['ddo_code'] = $monthData['ddo_code'] ?? '';
                         
                         foreach (['52301', '52302', '52303'] as $type) {
                             $this->settings[$colName][$type]['is_regular_lot'] = $monthData[$type]['is_regular_lot'] ?? false;
@@ -96,6 +98,8 @@ middleware(['auth', 'verified']);
                         $this->settings[$colName]['payment_type'] = '';
                         $this->settings[$colName]['aadhar_type'] = '';
                         $this->settings[$colName]['integration_type'] = '';
+                        $this->settings[$colName]['party_code'] = '';
+                        $this->settings[$colName]['ddo_code'] = '';
                         
                         foreach (['52301', '52302', '52303'] as $type) {
                             $this->settings[$colName][$type]['is_regular_lot'] = false;
@@ -128,7 +132,9 @@ middleware(['auth', 'verified']);
                         'payment_mode' => $data['payment_mode'] ?? '',
                         'payment_type' => $data['payment_type'] ?? '',
                         'aadhar_type' => $data['aadhar_type'] ?? '',
-                        'integration_type' => $data['integration_type'] ?? ''
+                        'integration_type' => $data['integration_type'] ?? '',
+                        'party_code' => $data['party_code'] ?? '',
+                        'ddo_code' => $data['ddo_code'] ?? ''
                     ];
                     
                     foreach (['52301', '52302', '52303'] as $type) {
@@ -267,7 +273,7 @@ middleware(['auth', 'verified']);
                                 </td>
 
                                 <td class="px-4 py-3 align-middle border-r border-gray-300 text-center">
-                                    <select wire:model="settings.{{ strtolower($month->code) }}.payment_mode" class="w-full max-w-[120px] mx-auto border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                    <select wire:model.live="settings.{{ strtolower($month->code) }}.payment_mode" class="w-full max-w-[120px] mx-auto border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
                                         <option value="">-- Mode --</option>
                                         @foreach($paymentModes as $mode)
                                             <option value="{{ $mode->code }}">{{ $mode->name }}</option>
@@ -279,6 +285,11 @@ middleware(['auth', 'verified']);
                                         <option value="api">API Base</option>
                                         <option value="sftp">SFTP Base</option>
                                     </select>
+
+                                    @if(isset($settings[strtolower($month->code)]['payment_mode']) && in_array($settings[strtolower($month->code)]['payment_mode'], ['5202', '5203']))
+                                        <input type="text" wire:model="settings.{{ strtolower($month->code) }}.party_code" placeholder="Party Code" class="mt-2 w-full max-w-[120px] mx-auto border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                        <input type="text" wire:model="settings.{{ strtolower($month->code) }}.ddo_code" placeholder="DDO Code" class="mt-2 w-full max-w-[120px] mx-auto border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                    @endif
                                 </td>
                                 
                                 <!-- Creation (52301) -->

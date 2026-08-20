@@ -23,8 +23,8 @@ class SbiSftpIntegrationService implements PaymentSBIIntegrationInterface
 
     private function __construct()
     {
-        // Read SFTP server from application settings (config/app.php)
-        $this->sbi_sftp_server = config('app.sbi_sftp_server');
+        // Read SFTP server from application settings (config/sbi.php)
+        $this->sbi_sftp_server ='sftp_sbi';
 
         // RSA KEY FOR ENCRYPTION
         $this->dec_privateKey = file_exists(storage_path('app/cert_enc/jb-private-key.pem')) ? file_get_contents(storage_path('app/cert_enc/jb-private-key.pem')) : null;
@@ -151,9 +151,9 @@ class SbiSftpIntegrationService implements PaymentSBIIntegrationInterface
         $xmlFile->save($unsigned_xml_file);
 
         $signed_xml_file = storage_path('app/sbi/signed/') . $debitRef . ".xml";
-        // Read certificate details from application settings (config/app.php)
-        $cert = config('app.sbi_cert_path');
-        $certPass = config('app.sbi_cert_pass');
+        // Read certificate details from application settings (config/sbi.php)
+        $cert = config('sbi.cert_path');
+        $certPass = config('sbi.cert_pass');
         
         $xmlSigner = new XmlSigner();
         if (file_exists($cert)) {

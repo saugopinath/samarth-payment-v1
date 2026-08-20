@@ -76,31 +76,10 @@ class PaymentLotRepository implements PaymentLotRepositoryInterface
         string $paymentType,
         array $filters = []
     ): bool {
-        $amountRs = 0;
-        $setting = PaymentMainSetting::where('scheme_id', $schemeId)
-            ->where('financial_year', $financialYear)
-            ->first();
-
-        if ($setting) {
-            $monthField = strtolower($lotMonth);
-            $monthData = $setting->$monthField;
-            if (is_array($monthData) && isset($monthData['amount'])) {
-                $amountRs = (float) $monthData['amount'];
-            }
-            if (is_array($monthData) && isset($monthData['aadhar_type'])) {
-                $aadharType = $monthData['aadhar_type'];
-            }
-        }
-
-        $benDetailsQuery = $this->getBaseBeneficiaryQuery($schemeId, $paymentType, $filters, $lotMonth, $financialYear, true);
-
-        $this->applyLotControlFilters($benDetailsQuery, $lotMaster);
-
-        if (!empty($filters['limit'])) {
-            $benDetailsQuery->limit((int) $filters['limit']);
-        }
-
-        $benDetails = $benDetailsQuery->get();
+        $processingData = $this->getLotProcessingData($lotMaster, $schemeId, $financialYear, $lotMonth, $paymentType, $filters);
+        $benDetails = $processingData['benDetails'];
+        $amountRs = $processingData['amountRs'];
+        $aadharType = $processingData['aadharType'];
         $sbiData = [];
         $debitReference = 'WB003' . \Carbon\Carbon::parse($lotMaster->created_at)->format('dmY') . str_pad($lotMaster->lot_no, 4, '0', STR_PAD_LEFT);
 
@@ -184,33 +163,10 @@ class PaymentLotRepository implements PaymentLotRepositoryInterface
         string $paymentType,
         array $filters = []
     ): bool {
-        $amountRs = 0;
-        $setting = PaymentMainSetting::where('scheme_id', $schemeId)
-            ->where('financial_year', $financialYear)
-            ->first();
-
-        if ($setting) {
-            $monthField = strtolower($lotMonth);
-            $monthData = $setting->$monthField;
-            if (is_array($monthData) && isset($monthData['amount'])) {
-                $amountRs = (float) $monthData['amount'];
-            }
-            if (is_array($monthData) && isset($monthData['aadhar_type'])) {
-                $aadharType = $monthData['aadhar_type'];
-            }
-        }
-
-        $benDetailsQuery = $this->getBaseBeneficiaryQuery($schemeId, $paymentType, $filters, $lotMonth, $financialYear, true);
-
-        $benDetailsQuery->whereNotNull('ben_payment_details.mobile_no');
-
-        $this->applyLotControlFilters($benDetailsQuery, $lotMaster);
-
-        if (!empty($filters['limit'])) {
-            $benDetailsQuery->limit((int) $filters['limit']);
-        }
-
-        $benDetails = $benDetailsQuery->get();
+        $processingData = $this->getLotProcessingData($lotMaster, $schemeId, $financialYear, $lotMonth, $paymentType, $filters, true);
+        $benDetails = $processingData['benDetails'];
+        $amountRs = $processingData['amountRs'];
+        $aadharType = $processingData['aadharType'];
        // dd($benDetails);
         $sbiData = [];
 
@@ -269,6 +225,65 @@ class PaymentLotRepository implements PaymentLotRepositoryInterface
             \Illuminate\Support\Facades\DB::connection('pgsql_payment')->rollBack();
             throw $e;
         }
+    }
+
+    /**
+     * Get common processing data for transaction lot generation.
+     *
+     * @param PaymentLotMaster $lotMaster
+     * @param int $schemeId
+     * @param string $financialYear
+     * @param string $lotMonth
+     * @param string $paymentType
+     * @param array $filters
+     * @param bool $requireMobile
+     * @return array
+     */
+    protected function getLotProcessingData(
+        PaymentLotMaster $lotMaster,
+        int $schemeId,
+        string $financialYear,
+        string $lotMonth,
+        string $paymentType,
+        array $filters,
+        bool $requireMobile = false
+    ): array {
+        $amountRs = 0;
+        $aadharType = null;
+        $setting = PaymentMainSetting::where('scheme_id', $schemeId)
+            ->where('financial_year', $financialYear)
+            ->first();
+
+        if ($setting) {
+            $monthField = strtolower($lotMonth);
+            $monthData = $setting->$monthField;
+            if (is_array($monthData) && isset($monthData['amount'])) {
+                $amountRs = (float) $monthData['amount'];
+            }
+            if (is_array($monthData) && isset($monthData['aadhar_type'])) {
+                $aadharType = $monthData['aadhar_type'];
+            }
+        }
+
+        $benDetailsQuery = $this->getBaseBeneficiaryQuery($schemeId, $paymentType, $filters, $lotMonth, $financialYear, true);
+
+        if ($requireMobile) {
+            $benDetailsQuery->whereNotNull('ben_payment_details.mobile_no');
+        }
+
+        $this->applyLotControlFilters($benDetailsQuery, $lotMaster);
+
+        if (!empty($filters['limit'])) {
+            $benDetailsQuery->limit((int) $filters['limit']);
+        }
+
+        $benDetails = $benDetailsQuery->get();
+
+        return [
+            'benDetails' => $benDetails,
+            'amountRs' => $amountRs,
+            'aadharType' => $aadharType
+        ];
     }
 
     /**

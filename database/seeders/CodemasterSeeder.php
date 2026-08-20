@@ -226,7 +226,7 @@ class CodemasterSeeder extends Seeder
         if (is_array($paymentChilds)) {
             $codemasterChilds = array_merge($codemasterChilds, $paymentChilds);
         }
-        $sbiChilds = config('sbi.childs');
+        $sbiChilds = config('sbi.payment_response_code');
         if (is_array($sbiChilds)) {
             $codemasterChilds = array_merge($codemasterChilds, $sbiChilds);
         }

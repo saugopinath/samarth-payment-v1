@@ -379,7 +379,28 @@ middleware(['auth', 'verified']);
                     'target_payment_mode.required' => 'Target Payment Mode is required.',
                 ]);
 
-               
+                $service = app(\App\Services\PaymentLotService::class);
+                $filters = [
+                    'district_id' => $this->district_id ? District::find($this->district_id)?->lgd_code : null,
+                    'rural_urban_id' => $this->rural_urban,
+                    'block_id' => $this->block_id ? Block::find($this->block_id)?->lgd_code : null,
+                    'municipality_id' => $this->municipality_id ? Municipality::find($this->municipality_id)?->lgd_code : null,
+                    'gp_id' => $this->gp_id ? Panchayat::find($this->gp_id)?->lgd_code : null,
+                    'ward_id' => $this->ward_id ? Ward::find($this->ward_id)?->lgd_code : null,
+                    'limit' => $this->limit ?: null,
+                ];
+
+                $previewData = $service->previewTransactionLot(
+                    (int) $this->scheme,
+                    $this->lot_financial_year,
+                    $this->lot_month,
+                    $this->payment_type ?? '',
+                    $this->target_payment_mode,
+                    $this->lot_type,
+                    $filters
+                );
+
+                if ($previewData['beneficiary_count'] > 0) {
                     $lotMaster = \App\Models\PaymentLotMaster::create([
                         'lot_month' => $this->lot_month,
                         'lot_year' => $this->lot_financial_year,
@@ -388,17 +409,6 @@ middleware(['auth', 'verified']);
                         'lot_type_id' => $this->lot_type,
                         'cur_status' => config('payment_lot.status.common.generated'),
                     ]);
-
-                    $service = app(\App\Services\PaymentLotService::class);
-                    $filters = [
-                        'district_id' => $this->district_id ? District::find($this->district_id)?->lgd_code : null,
-                        'rural_urban_id' => $this->rural_urban,
-                        'block_id' => $this->block_id ? Block::find($this->block_id)?->lgd_code : null,
-                        'municipality_id' => $this->municipality_id ? Municipality::find($this->municipality_id)?->lgd_code : null,
-                        'gp_id' => $this->gp_id ? Panchayat::find($this->gp_id)?->lgd_code : null,
-                        'ward_id' => $this->ward_id ? Ward::find($this->ward_id)?->lgd_code : null,
-                        'limit' => $this->limit ?: null,
-                    ];
 
                     $success = $service->generateTransactionLot(
                         $lotMaster,
@@ -415,10 +425,13 @@ middleware(['auth', 'verified']);
                         throw new \Exception("Failed to generate transaction lot records completely.");
                     }
 
-                $lotNo = $lotMaster->lot_no;
+                    $lotNo = $lotMaster->lot_no;
 
-                session()->flash('status', 'Lot generated successfully! Lot No: ' . $lotNo);
-                $this->resetForm();
+                    session()->flash('status', 'Lot generated successfully! Lot No: ' . $lotNo);
+                    $this->resetForm();
+                } else {
+                    session()->flash('error', 'No beneficiaries found for the selected criteria. Lot creation aborted.');
+                }
             };
         ?>
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-8">
@@ -426,6 +439,12 @@ middleware(['auth', 'verified']);
             @if(session('status'))
                 <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
                     <span class="block sm:inline">{{ session('status') }}</span>
+                </div>
+            @endif
+
+            @if(session('error'))
+                <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+                    <span class="block sm:inline">{{ session('error') }}</span>
                 </div>
             @endif
 

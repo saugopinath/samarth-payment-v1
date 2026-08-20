@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'childs' => [
+    'payment_response_code' => [
         array(
                 "name" => "SUCCESS",
                 "short_name" => "S00",
@@ -303,6 +303,201 @@ return [
                 "code" => "52650",
             ),
         array(
+                "code" => "52618",
+            ),
+        array(
+                "name" => "CUSTOMER TURNED MAJOR NOW",
+                "short_name" => "E17",
+                "parent_short_code" => "sbi_status_code",
+                "code" => "52619",
+            ),
+        array(
+                "name" => "WELCOME KIT NOT ISSUED",
+                "short_name" => "E18",
+                "parent_short_code" => "sbi_status_code",
+                "code" => "52620",
+            ),
+        array(
+                "name" => "INTER BRANCH TRANSACTION NOT ALLOWED",
+                "short_name" => "E19",
+                "parent_short_code" => "sbi_status_code",
+                "code" => "52621",
+            ),
+        array(
+                "name" => "INVALID RECEIVER IFSC CODE",
+                "short_name" => "E20",
+                "parent_short_code" => "sbi_status_code",
+                "code" => "52622",
+            ),
+        array(
+                "name" => "PARTICIPANT NOT MAPPED TO - APBS PRESENTATION",
+                "short_name" => "E21",
+                "parent_short_code" => "sbi_status_code",
+                "code" => "52623",
+            ),
+        array(
+                "name" => "INVALID AADHAAR",
+                "short_name" => "E22",
+                "parent_short_code" => "sbi_status_code",
+                "code" => "52624",
+            ),
+        array(
+                "name" => "AADHAAR NOT MAPPED TO ACCOUNT",
+                "short_name" => "E23",
+                "parent_short_code" => "sbi_status_code",
+                "code" => "52625",
+            ),
+        array(
+                "name" => "INACTIVE AADHAAR",
+                "short_name" => "E24",
+                "parent_short_code" => "sbi_status_code",
+                "code" => "52626",
+            ),
+        array(
+                "name" => "NETWORK FAILURE",
+                "short_name" => "E25",
+                "parent_short_code" => "sbi_status_code",
+                "code" => "52627",
+            ),
+        array(
+                "name" => "TRANSACTION PENDING",
+                "short_name" => "E26",
+                "parent_short_code" => "sbi_status_code",
+                "code" => "52628",
+            ),
+        array(
+                "name" => "DUPLICATE TRANSACTION",
+                "short_name" => "E27",
+                "parent_short_code" => "sbi_status_code",
+                "code" => "52629",
+            ),
+        array(
+                "name" => "RECALLED BY AGENCY",
+                "short_name" => "E28",
+                "parent_short_code" => "sbi_status_code",
+                "code" => "52630",
+            ),
+        array(
+                "name" => "MANDATE CANCELLED",
+                "short_name" => "E29",
+                "parent_short_code" => "sbi_status_code",
+                "code" => "52631",
+            ),
+        array(
+                "name" => "INCORRECT STATE CODE",
+                "short_name" => "E30",
+                "parent_short_code" => "sbi_status_code",
+                "code" => "52632",
+            ),
+        array(
+                "name" => "INCORRECT DISTRICT CODE",
+                "short_name" => "E31",
+                "parent_short_code" => "sbi_status_code",
+                "code" => "52633",
+            ),
+        array(
+                "name" => "HASH VALUE OF DIGITAL SIGNATURE MISMATCH",
+                "short_name" => "E32",
+                "parent_short_code" => "sbi_status_code",
+                "code" => "52634",
+            ),
+        array(
+                "name" => "DEBIT REFERENCE AND FILE NAME ARE DIFFERENT",
+                "short_name" => "E33",
+                "parent_short_code" => "sbi_status_code",
+                "code" => "52635",
+            ),
+        array(
+                "name" => "FILE NOT DIGITALLY SIGNED",
+                "short_name" => "E34",
+                "parent_short_code" => "sbi_status_code",
+                "code" => "52636",
+            ),
+        array(
+                "name" => "INVALID FILE NAME",
+                "short_name" => "E35",
+                "parent_short_code" => "sbi_status_code",
+                "code" => "52637",
+            ),
+        array(
+                "name" => "DUPLICATE FILE",
+                "short_name" => "E36",
+                "parent_short_code" => "sbi_status_code",
+                "code" => "52638",
+            ),
+        array(
+                "name" => "RECORD COUNT AND AMOUNT GIVEN UNDER DEBIT TAG DOES NOT MATCH WITH ACTUAL RECORDS IN THE FILE",
+                "short_name" => "E37",
+                "parent_short_code" => "sbi_status_code",
+                "code" => "52639",
+            ),
+        array(
+                "name" => "DEBIT REFERENCE DOES NOT EXISTS",
+                "short_name" => "E38",
+                "parent_short_code" => "sbi_status_code",
+                "code" => "52640",
+            ),
+        array(
+                "name" => "CREDIT REFERENCE DOES NOT EXISTS",
+                "short_name" => "E39",
+                "parent_short_code" => "sbi_status_code",
+                "code" => "52641",
+            ),
+        array(
+                "name" => "MISSING DEBIT ACCOUNT NUMBER",
+                "short_name" => "E40",
+                "parent_short_code" => "sbi_status_code",
+                "code" => "52642",
+            ),
+        array(
+                "name" => "MANDATORY FIELDS MISSING",
+                "short_name" => "E41",
+                "parent_short_code" => "sbi_status_code",
+                "code" => "52643",
+            ),
+        array(
+                "name" => "INVALID SPONSOR BANK IFSC CODE",
+                "short_name" => "E42",
+                "parent_short_code" => "sbi_status_code",
+                "code" => "52644",
+            ),
+        array(
+                "name" => "INVALID FILE FORMAT",
+                "short_name" => "E43",
+                "parent_short_code" => "sbi_status_code",
+                "code" => "52645",
+            ),
+        array(
+                "name" => "MISCELLANEOUS",
+                "short_name" => "E99",
+                "parent_short_code" => "sbi_status_code",
+                "code" => "52646",
+            ),
+        array(
+                "name" => "AADHAAR MAPPING DOES NOT EXISTS",
+                "short_name" => "E44",
+                "parent_short_code" => "sbi_status_code",
+                "code" => "52647",
+            ),
+        array(
+                "name" => "INVALID AMOUNT",
+                "short_name" => "E45",
+                "parent_short_code" => "sbi_status_code",
+                "code" => "52648",
+            ),
+        array(
+                "name" => "DIGITAL CERTIFICATE EXPIRED",
+                "short_name" => "E46",
+                "parent_short_code" => "sbi_status_code",
+                "code" => "52649",
+            ),
+        array(
+                "name" => "INVALID DESTINATION IIN",
+                "short_name" => "E47",
+                "parent_short_code" => "sbi_status_code",
+                "code" => "52650",
+            ),
+        array(
                 "name" => "INVALID NPCI USER ID OR USER NAME",
                 "short_name" => "E48",
                 "parent_short_code" => "sbi_status_code",
@@ -314,5 +509,16 @@ return [
                 "parent_short_code" => "sbi_status_code",
                 "code" => "52652",
             ),
-    ]
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | SBI SFTP Server Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Used by the PaymentLotIntegrationService for pushing XML lots to SBI.
+    |
+    */
+
+ 
 ];
