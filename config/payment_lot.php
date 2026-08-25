@@ -22,6 +22,7 @@ $status = [
         'signed'               => 'PLSSBISIGN',
     ],
     'ifms' => [
+        'dotdone'             => 'PLSIFMSDOTDONE',
         'treasury'             => 'PLSIFMSTreasury',
         'rbi'                  => 'PLSIFMSRBI',
         'all_action_done'      => 'PLSIFMSAllActionDone',

@@ -241,7 +241,9 @@ class CodemasterSeeder extends Seeder
         // Deduplicate childs
         $uniqueChilds = [];
         foreach ($codemasterChilds as $child) {
-            $uniqueChilds[$child['short_name']] = $child;
+            if (isset($child['short_name'])) {
+                $uniqueChilds[$child['short_name']] = $child;
+            }
         }
         $codemasterChilds = array_values($uniqueChilds);
 

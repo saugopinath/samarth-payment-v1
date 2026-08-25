@@ -215,6 +215,61 @@ middleware(['auth', 'verified']);
                     session()->flash('error', 'Error checking response for lot ' . $lotNo . ': ' . $e->getMessage());
                 }
             };
+            $checkdotDone = function ($lotNo) {
+                try {
+                    $lotMaster = \App\Models\PaymentLotMaster::where('lot_no', $lotNo)->firstOrFail();
+                    
+                    $service = \App\Services\Integration\PaymentIntegrationFactory::make($lotNo);
+                    $result = $service->checkdotDone($lotMaster);
+
+                    if ($result['status'] == 1) {
+                        session()->flash('status', $result['msg']);
+                    } else if (in_array($result['status'], [2, 3, 4])) {
+                        session()->flash('error', $result['msg']);
+                    }
+
+                    $this->search();
+                } catch (\Exception $e) {
+                    session()->flash('error', 'Error checking acknowledgement for lot ' . $lotNo . ': ' . $e->getMessage());
+                }
+            };
+            $checkforTreasury = function ($lotNo) {
+                try {
+                    $lotMaster = \App\Models\PaymentLotMaster::where('lot_no', $lotNo)->firstOrFail();
+                    
+                    $service = \App\Services\Integration\PaymentIntegrationFactory::make($lotNo);
+                    $result = $service->checkTreasury($lotMaster);
+
+                    if ($result['status'] == 1) {
+                        session()->flash('status', $result['msg']);
+                    } else if (in_array($result['status'], [2, 3, 4])) {
+                        session()->flash('error', $result['msg']);
+                    }
+
+                    $this->search();
+                } catch (\Exception $e) {
+                    session()->flash('error', 'Error checking acknowledgement for lot ' . $lotNo . ': ' . $e->getMessage());
+                }
+            };
+            $checkforRBIResponse = function ($lotNo) {
+                try {
+                    $lotMaster = \App\Models\PaymentLotMaster::where('lot_no', $lotNo)->firstOrFail();
+                    
+                    $service = \App\Services\Integration\PaymentIntegrationFactory::make($lotNo);
+                    $result = $service->checkRBI($lotMaster);
+
+                    if ($result['status'] == 1) {
+                        session()->flash('status', $result['msg']);
+                    } else if (in_array($result['status'], [2, 3, 4])) {
+                        session()->flash('error', $result['msg']);
+                    }
+
+                    $this->search();
+                } catch (\Exception $e) {
+                    session()->flash('error', 'Error checking acknowledgement for lot ' . $lotNo . ': ' . $e->getMessage());
+                }
+            };
+          
 
             $defuncLot = function ($lotNo) {
                 try {

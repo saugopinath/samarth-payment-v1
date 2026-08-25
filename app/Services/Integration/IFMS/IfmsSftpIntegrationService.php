@@ -5,6 +5,7 @@ namespace App\Services\Integration\IFMS;
 use App\Models\PaymentLotMaster;
 use App\Models\SbiPaymentLotMasterAdditionalInfo;
 use App\Models\IfmsTransactionLotDetail;
+use App\Models\IfmsPaymentLotMasterAdditionalInfo;
 use App\Models\PaymentMainSetting;
 use App\Models\Scheme;
 use App\Services\Contracts\PaymentSBIIntegrationInterface;
@@ -33,7 +34,9 @@ class IfmsSftpIntegrationService implements PaymentSBIIntegrationInterface
 
     public function pushToTarget(PaymentLotMaster $lotMaster)
     {
+        set_time_limit(0);
         try {
+            // dd('ok');
             $DRN_part = $lotMaster->lot_no;
             $scheme_id = $lotMaster->scheme_id;
             
@@ -121,11 +124,17 @@ class IfmsSftpIntegrationService implements PaymentSBIIntegrationInterface
                 
                 $xmlFile->save($create_xml_file_path);
                 $xml_File = $xmlFile->saveXML($xmlFile->documentElement);
+                
                 if (app()->environment('local')) {
+                        try {
                             $doneFileName = $filename . '.xml.done';
-                            Storage::disk('ifms_sftp_' . $partyCode)->put('ePayment_Files_002/' . $doneFileName, '');
-                            Storage::disk('ifms_sftp_' . $partyCode)->put('ePayment_Files_002/ACK/' . $filename . '.xml', $xml_File);
-
+                            Storage::disk('ifms_sftp_' . $partyCode)->put(config('ifms.paths.epayment_files_002') . '/' . $doneFileName, '');
+                            Storage::disk('ifms_sftp_' . $partyCode)->put(config('ifms.paths.epayment_files_002') . '/ACK/' . $filename . '.xml', $xml_File);
+                           }
+                         catch (\Exception $e) {
+                            DB::rollback();
+                           //dd($e);
+                           }
                             $resXml = new DOMDocument("1.0", 'UTF-8');
                             $resXml->xmlStandalone = true;
                             $resXml->formatOutput = true;
@@ -161,22 +170,32 @@ class IfmsSftpIntegrationService implements PaymentSBIIntegrationInterface
                             if (substr($responseFileName, -4) !== '.xml') {
                                 $responseFileName .= '.xml';
                             }
-                            Storage::disk('ifms_sftp_' . $partyCode)->put('ePayment_Files_005/' . $responseFileName, $resXmlString);
+                            Storage::disk('ifms_sftp_' . $partyCode)->put(config('ifms.paths.epayment_files_005') . '/' . $responseFileName, $resXmlString);
                 }
                
-                 Storage::disk('ifms_sftp_' . $partyCode)->put('ePayment_Files_006/' . $filename . '.xml', $xml_File);   
+                 Storage::disk('ifms_sftp_' . $partyCode)->put(config('ifms.paths.epayment_files_006') . '/' . $filename . '.xml', $xml_File);   
 
-                // $ifmsDisk->put('ePayment_Files_006/' . $filename . '.xml', $xml_File); // uncomment in production
+                // $ifmsDisk->put(config('ifms.paths.epayment_files_006') . '/' . $filename . '.xml', $xml_File); // uncomment in production
                 
-                $exists = true; // simulated or could be: $ifmsDisk->exists('ePayment_Files_006/' . $filename . '.xml');
+                $exists = true; // simulated or could be: $ifmsDisk->exists(config('ifms.paths.epayment_files_006') . '/' . $filename . '.xml');
                 
                 if ($exists) {
 
                     DB::beginTransaction();
                     try {
+                        $lotMaster->file_name = $filename.'.xml';
+
                         $lotMaster->cur_status = config('payment_lot.status.common.push');
                         $lotMaster->payment_push_date = now();
                         $lotMaster->save();
+
+                        IfmsPaymentLotMasterAdditionalInfo::updateOrCreate(
+                            [
+                                'lot_no' => $lotMaster->lot_no,
+                                'scheme_id' => $lotMaster->scheme_id,
+                                'lot_year' => $lotMaster->lot_year,
+                            ]
+                        );
 
                         DB::commit();
                         
@@ -194,130 +213,32 @@ class IfmsSftpIntegrationService implements PaymentSBIIntegrationInterface
         }
     }
 
-    public function checkAcknowledge(PaymentLotMaster $lotMaster)
+    public function checkdotDone(PaymentLotMaster $lotMaster)
     {
-        try {
-            // dd('1');
-            // Assuming LotStatusLogHelper will be imported or is defined globally
-            $status_log = \App\Helpers\LotStatusLogHelper::getLotStatusLogDetails('ifms_payment_lot_submitted') ?? ['id' => 1, 'desc' => 'ifms_payment_lot_submitted'];
-            $scheme_id = $lotMaster->scheme_id;          ////parsed value
-
-            $schemeDetail =  DB::table('m_scheme')->select('party_code')->where('id', '=', $scheme_id)->first();
+        set_time_limit(0);
+        try { 
+            $scheme_id = $lotMaster->scheme_id;          
+            $schemeDetail =  DB::table('m_scheme')->select('party_code')->where('id',$scheme_id)->first();
             $partyCode = $schemeDetail->party_code;
+            $lot_no = $lotMaster->lot_no;  
+            $file_name = $lotMaster->file_name;      		     
+            //$exists = Storage::disk('ifms_sftp_' . $partyCode)->exists(config('ifms.paths.epayment_files_002') . '/ACK/' . $file_name . '.xml');
 
-            $lot_no = $lotMaster->lot_no;    		     ////parsed value
-            // dd($lot_no);
-            $existing_filename_details =  DB::connection('pgsql_paywrite')->table('payment.lot_master')->select('file_name')->where('lot_no', $lot_no)->where('scheme_id', $scheme_id)->first();
-            // dd($existing_filename_details);
-            $file_name = $existing_filename_details->file_name;
-            $DRN_part = substr($file_name, 22);
-
-            // Corrected disk name from 'sftp_' to 'ifms_sftp_' to match pushToTarget
-            // Corrected missing '/' after 'ACK'
-            $exists = Storage::disk('ifms_sftp_' . $partyCode)->exists('ePayment_Files_002/ACK/' . $file_name . '.xml');
-
+            $exists = Storage::disk('sftp_' . $partyCode)->exists(config('ifms.paths.epayment_files_002') . $file_name . '.xml.done');
             if ($exists) {
-
-                $lot_ack_status = DB::connection('pgsql_paywrite')->table('payment.lot_master')->select('ack_status')->where('lot_no', $DRN_part)->where('scheme_id', $scheme_id)->first();
-                if (is_null($lot_ack_status->ack_status)) {
-                    $remote_file = Storage::disk('ifms_sftp_' . $partyCode)->get('ePayment_Files_002/ACK/' . $file_name . '.xml');
-                    Storage::put('ifms_xml/ack/' . $partyCode . '/ACK/' . $file_name . '.xml', $remote_file);
-                    $remote_xml_file = simplexml_load_string($remote_file);
-
-                    $IFMS_REF_NO = $remote_xml_file->IFMS_REF_NO;
-
-                    $ifms_status = 'Payment Mandate Generated';
-
-                    $update_ack_status = DB::connection('pgsql_paywrite')->table('payment.lot_master')->where('lot_no', $DRN_part)->where('scheme_id', $scheme_id)->update(['ack_status' => 1, 'ref_no' => $IFMS_REF_NO, 'updated_at' => DB::raw("now()")]);  /////////add
-                    DB::connection('pgsql_paywrite')->table('ifms.transaction_lot')->where('lot_no', $DRN_part)->where('scheme_id', $scheme_id)->update(['ack_status' => 1, 'ref_no' => $IFMS_REF_NO, 'updated_at' => DB::raw("now()"), 'lot_status' => 4
-                    , 'lot_status_log' => DB::raw("lot_status_log || jsonb_build_object('action_id', ".$status_log['id'].", 			'action_desc', '".$status_log['desc']."', 'action_timestamp', NOW())")
-                    ]);
-
-                    $update_ifms_status = DB::connection('pgsql_paywrite')->table('ifms.transaction_lot_details')->where('drn_part', $DRN_part)->where('scheme_id', $scheme_id)->where('is_active', '<>', 0)->update(['ifms_status' => $ifms_status, 'ifms_ref_no' => $IFMS_REF_NO, 'updated_at' => DB::raw("now()")]);
-                    DB::connection('pgsql_paywrite')->table('ifms.transaction_payload')->where('lot_no', $DRN_part)->where('scheme_id', $scheme_id)->where('file_name', $file_name)->update(['status' => 1,/*xml 'ack_payload' => $remote_file,*/ 'updated_at' => DB::raw("now()")]);
-
-                    $wrong_file = $this->wrong_file_status($lotMaster);
-
-                    if ($wrong_file) {
-                        $response = array(
-                            'status' => 1, 'msg' => 'Reference No. ' . $IFMS_REF_NO . ' generated for Lot no. ' . $lot_no . '. ' . $wrong_file,
-                            'type' => 'green', 'icon' => 'fa check', 'title' => 'Success'
-                        );
-                    } else {
-                        $response = array(
-                            'status' => 2, 'msg' => 'Unable to check wrongdata.',
-                            'type' => 'red', 'icon' => 'fa warning', 'title' => 'Error'
-                        );
-                    }
-                } else {
-                    $response = array(
-                        'status' => 3, 'msg' => 'Bill reference no is already generated.',
-                        'type' => 'orange', 'icon' => 'fa info', 'title' => 'Complete'
-                    );
-                }
+              
+                $lotMaster->cur_status = config('payment_lot.status.ifms.dotdone'); // GENERATED,PUSHED AND RESPONSE RECEIVED
+                $lotMaster->response_receive_date = now();
+                $lotMaster->save();
+                   
+               
             } else {
 
-
-                $list = Storage::disk('ifms_sftp_' . $partyCode)->files('ePayment_Files_003');
-
-                $matches = preg_grep('/^ePayment_Files_003\/' . $file_name . '/', $list);
-                $matchescount = count($matches);
-                if ($matchescount == 0) {
-
-                    $filename = '';
-                } else {
-                    foreach ($matches as $matchitem) {
-                        $matchescount = $matchescount - 1;
-                        if ($matchescount == 0) {
-
-                            $filename = $matchitem;
-                        }
-                    }
-                }
-                $matchexists = Storage::disk('ifms_sftp_' . $partyCode)->exists($filename);
-                if ($matchexists) {
-                    $remote_error_file = Storage::disk('ifms_sftp_' . $partyCode)->get($filename);
-                    if (!empty($remote_error_file)) {
-                        $count_beneficiary = 0;
-                        $remote_xml_file_data = simplexml_load_string($remote_error_file);
-                        if (strpos($filename, 'D_') == true) {
-                            foreach ($remote_xml_file_data as $key => $value) {
-                                $count_beneficiary++;
-                            }
-                        }
-                        $beneficiary_count_from_db = DB::connection('pgsql_paywrite')->table('ifms.transaction_lot_details')->where('drn_part', $lot_no)
-                            ->where('scheme_id', $scheme_id)->where('is_active', 1)->count();
-                        if ($beneficiary_count_from_db == $count_beneficiary) {
-                            $wrong_file = $this->wrong_file_status($lotMaster);
-                            if ($wrong_file) {
-                                $response = array(
-                                    'status' => 4, 'msg' => 'Reference No. not generated for Lot no. ' . $lot_no . ' as all beneficiaries failed at IFMS. ' . $wrong_file,
-                                    'type' => 'red', 'icon' => 'fa warning', 'title' => 'Error'
-                                );
-                            } else {
-                                $response = array(
-                                    'status' => 5, 'msg' => 'Unable to check wrong data.',
-                                    'type' => 'red', 'icon' => 'fa warning', 'title' => 'Error'
-                                );
-                            }
-                        } else {
-                            $response = array(
-                                'status' => 6, 'msg' => 'IFMS Reference Not Generated.',
-                                'type' => 'red', 'icon' => 'fa warning', 'title' => 'Error'
-                            );
-                        }
-                    } else {
-                        $response = array(
-                            'status' => 7, 'msg' => 'System Error.',
-                            'type' => 'red', 'icon' => 'fa warning', 'title' => 'Error'
-                        );
-                    }
-                } else {
-                    $response = array(
-                        'status' => 8, 'msg' => 'No Acknowledgement, No Error File.',
-                        'type' => 'red', 'icon' => 'fa warning', 'title' => 'Error'
-                    );
-                }
+               $response = array(
+					'status' => 3, 'msg' => 'Lot no. ' . $lot_no . ' has not yet been received by IFMS.',
+					'type' => 'orange', 'icon' => 'fa fa-info', 'title' => 'Not Received'
+				);
+                
             }
         } catch (\Exception $e) {
             $response = array(
@@ -329,20 +250,241 @@ class IfmsSftpIntegrationService implements PaymentSBIIntegrationInterface
 
         return $response ?? [];
     }
-
-    public function checkResponse(PaymentLotMaster $lotMaster)
+    public function checkAcknowledge(PaymentLotMaster $lotMaster)
     {
-        // TODO: Implement IFMS SFTP response
-        return [
-            'status' => 1,
-            'msg' => 'IFMS SFTP response not yet implemented for Lot - ' . $lotMaster->lot_no,
-            'type' => 'blue'
-        ];
+       	$statusCode = 200;
+		$response = [];
+		try {
+			$scheme_id = $lotMaster->scheme_id;          
+            $schemeDetail =  DB::table('m_scheme')->select('party_code')->where('id',$scheme_id)->first();
+            $partyCode = $schemeDetail->party_code;
+            $lot_no = $lotMaster->lot_no;  
+            $file_name = $lotMaster->file_name;     
+			$exists = Storage::disk('sftp_' . $partyCode)->exists(config('ifms.paths.epayment_files_002') . '/ACK/' . $file_name . '.xml');
+
+			if ($exists) {
+				if (config('payment_lot.status.common.ack')==$lotMaster->cur_status) {
+                    $response = array(
+						'status' => 3, 'msg' => 'Bill reference no is already generated.',
+						'type' => 'orange', 'icon' => 'fa fa-info', 'title' => 'Complete'
+					);
+                }
+                else{
+                    $remote_file = Storage::disk('sftp_' . $partyCode)->get(config('ifms.paths.epayment_files_002') . '/ACK/' . $file_name . '.xml');
+					Storage::put('ifms_xml/ack/' . $partyCode . '/ACK' . $file_name . '.xml', $remote_file);
+					$remote_xml_file = simplexml_load_string($remote_file);
+
+					$IFMS_REF_NO = $remote_xml_file->IFMS_REF_NO;
+
+
+					$lotMaster->cur_status = config('payment_lot.status.common.ack'); // GENERATED,PUSHED AND RESPONSE RECEIVED
+                    $lotMaster->save();
+
+					$wrong_file = $this->wrong_file_status($partyCode,$filename);
+
+					if ($wrong_file) {
+						$response = array(
+							'status' => 1, 'msg' => 'Reference No. ' . $IFMS_REF_NO . ' generated for Lot no. ' . $lot_no . '. ' . $wrong_file,
+							'type' => 'green', 'icon' => 'fa fa-check', 'title' => 'Success'
+						);
+					} else {
+						$response = array(
+							'status' => 2, 'msg' => 'Unable to check wrongdata.',
+							'type' => 'red', 'icon' => 'fa fa-warning', 'title' => 'Error'
+						);
+					}
+				} 
+			} else {
+
+				$list = Storage::disk('sftp_' . $partyCode)->files(config('ifms.paths.epayment_files_003'));
+				$matches = preg_grep('/^' . config('ifms.paths.epayment_files_003') . '\/' . $file_name . '/', $list);
+				$matchescount = count($matches);
+				if ($matchescount == 0) {
+
+					$filename = '';
+				} else {
+					foreach ($matches as $matchitem) {
+						$matchescount = $matchescount - 1;
+						if ($matchescount == 0) {
+
+							$filename = $matchitem;
+						}
+					}
+				}
+				$matchexists = Storage::disk('sftp_' . $partyCode)->exists($filename);
+				if ($matchexists) {
+					$remote_error_file = Storage::disk('sftp_' . $partyCode)->get($filename);
+					if (!empty($remote_error_file)) {
+						$count_beneficiary = 0;
+						$remote_xml_file_data = simplexml_load_string($remote_error_file);
+						if (strpos($filename, 'D_') == true) {
+							foreach ($remote_xml_file_data as $key => $value) {
+								$count_beneficiary++;
+							}
+						}
+						$beneficiary_count_from_db = PaymentLotDetail::where('lot_no', $lot_no)
+							->where('scheme_id', $scheme_id)->count();
+						if ($beneficiary_count_from_db == $count_beneficiary) {
+							$wrong_file = $this->wrong_file_status($partyCode,$filename);
+							if ($wrong_file) {
+								$response = array(
+									'status' => 4, 'msg' => 'Reference No. not generated for Lot no. ' . $lot_no . ' as all beneficiaries failed at IFMS. ' . $wrong_file,
+									'type' => 'red', 'icon' => 'fa fa-warning', 'title' => 'Error'
+								);
+							} else {
+								$response = array(
+									'status' => 5, 'msg' => 'Unable to check wrong data.',
+									'type' => 'red', 'icon' => 'fa fa-warning', 'title' => 'Error'
+								);
+							}
+						} else {
+							$response = array(
+								'status' => 6, 'msg' => 'IFMS Reference Not Generated.',
+								'type' => 'red', 'icon' => 'fa fa-warning', 'title' => 'Error'
+							);
+						}
+					} else {
+						$response = array(
+							'status' => 7, 'msg' => 'System Error.',
+							'type' => 'red', 'icon' => 'fa fa-warning', 'title' => 'Error'
+						);
+					}
+				} else {
+					$response = array(
+						'status' => 8, 'msg' => 'No Acknowledgement, No Error File.',
+						'type' => 'red', 'icon' => 'fa fa-warning', 'title' => 'Error'
+					);
+				}
+			}
+		} catch (\Exception $e) {
+			$response = array(
+				'exception' => true,
+				'exception_message' => $e->getMessage(),
+				// 'exception_message' => 'Oops. Connection time out. Please try agian later.',
+			);
     }
-
-    private function wrong_file_status(PaymentLotMaster $lotMaster)
+        return $response ?? [];
+    }
+  
+    
+     public function checkResponse(PaymentLotMaster $lotMaster)
     {
-        
+         $scheme_id = $lotMaster->scheme_id;          
+         $schemeDetail =  DB::table('m_scheme')->select('party_code')->where('id',$scheme_id)->first();
+         $partyCode = $schemeDetail->party_code;
+         $lot_no = $lotMaster->lot_no;  
+         $file_name = $lotMaster->file_name;      
+         $exists = Storage::disk('sftp_' . $partyCode)->exists($filename);
+		 $return_status = '';
+		 $exists = Storage::disk('sftp_' . $partyCode)->exists(config('ifms.paths.ePayment_Files_005') . $file_name . '.xml');
+         if ($exists) {
+            $codemasterChilds = collect(config('codemaster.childs'));
+            $failedTypeCode = $codemasterChilds->where('short_name', 'payment_failed')->first()['code'] ?? '1415';
+            $sbiSourceCode = $codemasterChilds->where('short_name', 'ifms')->first()['code'] ?? '5202';
+            $return_status = 'success';		
+            $remote_file = Storage::disk('sftp_' . $partyCode)->get(config('ifms.paths.ePayment_Files_005') . $file_name . '.xml');
+			$fname = substr($filename, 18);
+			Storage::put('ifms_xml/rbi_resp/' . $partyCode . $fname, $remote_file);
+			$remote_xml_file = simplexml_load_string($remote_file);	
+            $DRN = $remote_xml_file->DRN;
+            $voucherNo = $remote_xml_file->voucherNo;
+            $voucherDate = $remote_xml_file->voucherDate;
+            $tokenNo = $remote_xml_file->tokenNo;
+            $tokenDate = $remote_xml_file->tokenDate;
+            $success_count = 0;
+            $failed_count = 0;
+            $i = 0;
+           	foreach ($remote_xml_file as $key => $value) {
+
+			$j = 0;
+			foreach ($value as $key2[$j] => $val2[$j]) {
+				if ($j == 0) {
+					$acc_no = $val2[$j];
+				}
+				if ($j == 1) {
+					$amount = $val2[$j];
+				}
+				if ($j == 2) {
+					$fileName = $val2[$j];
+				}
+				if ($j == 3) {
+					$ifscCode = $val2[$j];
+				}
+				if ($j == 4) {
+					$paymentDt = $val2[$j];
+				}
+				if ($j == 5) {
+					$reason = $val2[$j];
+				}
+				if ($j == 6) {
+					$refBenfId = $val2[$j];
+				}
+				if ($j == 7) {
+					$refOrdernoDt = $val2[$j];
+				}
+				if ($j == 8) {
+					$referenceNo = $val2[$j];
+				}
+				if ($j == 9) {
+					$status = $val2[$j];
+				}
+				if ($j == 10) {
+					$utrNo = $val2[$j];
+					if ($status == 'Success') {
+						$success_count = $success_count + 1;
+					} elseif ($status == 'Failed') {
+						$failed_count = $failed_count + 1;
+                        \App\Models\FailedPaymentDetail::Create([
+                                        'lot_no' => $lotMaster->lot_no,
+                                        'ben_id' => $refBenfId,
+                                        'scheme_id' => $lotMaster->scheme_id,
+                                        'status_code' => $mapped_status_code,
+                                        'remarks' => $reason,
+                                        'failed_type' => $failedTypeCode,
+                                        'failed_source' => $sbiSourceCode
+                                    ]);
+					} else {
+						break;						
+					}
+				}
+                    
+                            // Update IfmsTransactionLotDetail
+                            $detail = IfmsTransactionLotDetail::where('lot_no', $lotMaster->lot_no)
+                                ->where('scheme_id', $lotMaster->scheme_id)->where('ben_id', $refBenfId)->first();
+
+                            if ($detail) {
+                                $codemasterStatus = \App\Models\Codemaster::where('short_name', $status)
+                                    ->where('parent_short_code', 'ifms_status_code')
+                                    ->first();
+                                $mapped_status_code = $codemasterStatus ? $codemasterStatus->code : $credit_status;
+
+                                $detail->status = $mapped_status_code; // Map to our internal codemaster code
+                                $detail->utr_no = $utrNo;
+                                $detail->voucher_no = $voucherNo;
+                                $detail->voucher_date = $voucherDate;
+                                $detail->token_no = $tokenNo;
+                                $detail->token_date = $tokenDate;
+                                $detail->rbi_failed_count = $failed_count;
+                                 $detail->rbi_success_count = $success_count;
+                                // Add other fields if required by your DB schema
+                                $detail->save();
+
+                                
+                            }
+
+				$j = $j + 1;
+			}
+
+			$i = $i + 1;
+		}
+		 }else{
+			$return_status = 'error';
+		 }
+		return $return_status;
+    }
+   public function wrong_file_status($partyCode,$filename)
+	{      /////parse scheme_id, lot_no
+
 		$scheme_id = $request->get('scheme_id');          ////parsed value
 		$schemeDetail =  DB::table('m_scheme')->select('party_code')->where('id', '=', $scheme_id)->first();
 		$partyCode = $schemeDetail->party_code;
@@ -448,6 +590,6 @@ class IfmsSftpIntegrationService implements PaymentSBIIntegrationInterface
 		} else {
 			return 'No Wrong Data File Received ';
 		}
-    }
+	}
 }
 
