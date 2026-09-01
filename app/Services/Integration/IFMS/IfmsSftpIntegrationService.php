@@ -94,7 +94,7 @@ class IfmsSftpIntegrationService implements PaymentSBIIntegrationInterface
                 $this->simulateLocalEnvironment($partyCode, $filename, $fileNameFromDb, $xmlString, $drnFull, $benData);
             }
             
-            Storage::disk("ifms_sftp_{$partyCode}")->put(config('ifms.paths.epayment_files_006') . '/' . $filename . '.xml', $xmlString);
+            Storage::disk("ifms_sftp_{$partyCode}")->put(config('ifms.paths.xmlpush') . '/' . $filename . '.xml', $xmlString);
 
             // simulated or could be: $ifmsDisk->exists(...)
             $exists = true; 
@@ -102,7 +102,7 @@ class IfmsSftpIntegrationService implements PaymentSBIIntegrationInterface
             if ($exists) {
                 DB::beginTransaction();
                 try {
-                    $lotMaster->file_name = $filename . '.xml';
+                    $lotMaster->file_name = $filename;
                     $lotMaster->cur_status = config('payment_lot.status.common.push');
                     $lotMaster->payment_push_date = now();
                     $lotMaster->save();
@@ -133,6 +133,7 @@ class IfmsSftpIntegrationService implements PaymentSBIIntegrationInterface
 
     public function checkdotDone(PaymentLotMaster $lotMaster): array
     {
+       // dd('ok');
         set_time_limit(0);
         try { 
             $lotNo = $lotMaster->lot_no;
@@ -156,12 +157,12 @@ class IfmsSftpIntegrationService implements PaymentSBIIntegrationInterface
                 }
             }
             $lotNo = $lotMaster->lot_no;  
-            $fileName = $lotMaster->file_name;      		     
+            $fileName = $lotMaster->file_name;      	
+            //dump(config('ifms.paths.dotdone'));dump($partyCode);dd( $fileName);	     
 
-            $exists = Storage::disk("ifms_sftp_{$partyCode}")->exists(config('ifms.paths.epayment_files_002') . $fileName . '.xml.done');
+            $exists = Storage::disk("ifms_sftp_{$partyCode}")->exists(config('ifms.paths.dotdone') . '/' . $fileName . '.xml.done');
             if ($exists) {
                 $lotMaster->cur_status = config('payment_lot.status.ifms.dotdone'); // GENERATED, PUSHED AND RESPONSE RECEIVED
-                $lotMaster->response_receive_date = now();
                 $lotMaster->save();
                 
                 return [
@@ -214,12 +215,20 @@ class IfmsSftpIntegrationService implements PaymentSBIIntegrationInterface
             }
             $lotNo = $lotMaster->lot_no;  
             $fileName = $lotMaster->file_name;
-            
+            if ($lotMaster->cur_status != config('payment_lot.status.common.dotdone')) {
+                    return [
+                        'status' => 3, 
+                        'msg' => 'Bill reference no is already generated.',
+                        'type' => 'orange', 
+                        'icon' => 'fa fa-info', 
+                        'title' => 'Complete'
+                    ];
+            }
             if (!str_ends_with($fileName, '.xml')) {
                 $fileName .= '.xml';
             }
             
-            $exists = Storage::disk("ifms_sftp_{$partyCode}")->exists(config('ifms.paths.epayment_files_002') . '/ACK/' . $fileName);
+            $exists = Storage::disk("ifms_sftp_{$partyCode}")->exists(config('ifms.paths.ack') .$fileName);
 
             if ($exists) {
                 if ($lotMaster->cur_status == config('payment_lot.status.common.ack')) {
@@ -232,7 +241,7 @@ class IfmsSftpIntegrationService implements PaymentSBIIntegrationInterface
                     ];
                 }
                 
-                $remoteFile = Storage::disk("ifms_sftp_{$partyCode}")->get(config('ifms.paths.epayment_files_002') . '/ACK/' . $fileName);
+                $remoteFile = Storage::disk("ifms_sftp_{$partyCode}")->get(config('ifms.paths.ack') .$fileName);
                 Storage::put("ifms_xml/ack/{$partyCode}/ACK" . $fileName, $remoteFile);
                 $remoteXmlFile = simplexml_load_string($remoteFile);
 
@@ -240,9 +249,11 @@ class IfmsSftpIntegrationService implements PaymentSBIIntegrationInterface
 
                 $lotMaster->cur_status = config('payment_lot.status.common.ack');
                 $lotMaster->save();
-
+                $lotInfo = \App\Models\IfmsPaymentLotMasterAdditionalInfo::where('lot_no', $lotNo)->firstOrFail();
+                $lotInfo->cur_status = $ifmsRefNo;
+                $lotInfo->save();
                 $wrongFileStatus = $this->wrong_file_status($partyCode, $fileName, $schemeId, $lotNo);
-                dd($wrongFileStatus);
+               // dd($wrongFileStatus);
                 if ($wrongFileStatus) {
                     return [
                         'status' => 1, 
@@ -261,10 +272,10 @@ class IfmsSftpIntegrationService implements PaymentSBIIntegrationInterface
                     ];
                 }
             } 
-            
+            else{
             // Check Error File if ACK doesn't exist
-            $list = Storage::disk("ifms_sftp_{$partyCode}")->files(config('ifms.paths.epayment_files_003'));
-            $matches = preg_grep('/^' . preg_quote(config('ifms.paths.epayment_files_003') . '/' . $fileName, '/') . '/', $list);
+            $list = Storage::disk("ifms_sftp_{$partyCode}")->files(config('ifms.paths.wrong'));
+            $matches = preg_grep('/^' . preg_quote(config('ifms.paths.wrong') . '/' . $fileName, '/') . '/', $list);
             
             if (!empty($matches)) {
                 $errorFileName = end($matches);
@@ -320,7 +331,13 @@ class IfmsSftpIntegrationService implements PaymentSBIIntegrationInterface
                         ];
                     }
                 } 
-            }
+            }else {
+					return array(
+						'status' => 8, 'msg' => 'No Acknowledgement, No Error File.',
+						'type' => 'red', 'icon' => 'fa fa-warning', 'title' => 'Error'
+					);
+				}
+        }
             
             return [
                 'status' => 8, 
@@ -368,8 +385,10 @@ class IfmsSftpIntegrationService implements PaymentSBIIntegrationInterface
             if (!str_ends_with($fileName, '.xml')) {
                 $fileName .= '.xml';
             }
-
-            $exists = Storage::disk("sftp_{$partyCode}")->exists(config('ifms.paths.ePayment_Files_005') . $fileName);
+           // dd($fileName);
+           $fileName1=$partyCode. $fileName;
+           //dd($fileName1);
+            $exists = Storage::disk("ifms_sftp_{$partyCode}")->exists(config('ifms.paths.response') .$fileName1);
             if (!$exists) {
                 return 'error';
             }
@@ -378,7 +397,7 @@ class IfmsSftpIntegrationService implements PaymentSBIIntegrationInterface
             $failedTypeCode = $codemasterChilds->where('short_name', 'payment_failed')->first()['code'] ?? '1415';
             $sbiSourceCode = $codemasterChilds->where('short_name', 'ifms')->first()['code'] ?? '5202';
             
-            $remoteFile = Storage::disk("sftp_{$partyCode}")->get(config('ifms.paths.ePayment_Files_005') . $fileName);
+            $remoteFile = Storage::disk("ifms_sftp_{$partyCode}")->get(config('ifms.paths.response') . $fileName);
             $fname = substr($fileName, 18);
             Storage::put("ifms_xml/rbi_resp/{$partyCode}{$fname}", $remoteFile);
             
@@ -456,8 +475,8 @@ class IfmsSftpIntegrationService implements PaymentSBIIntegrationInterface
         try {
             
             
-            $list = Storage::disk("ifms_sftp_{$partyCode}")->files('ePayment_Files_003');
-            $matchingFiles = preg_grep('/^' . preg_quote('ePayment_Files_003/' . $fileName, '/') . '/', $list);
+            $list = Storage::disk("ifms_sftp_{$partyCode}")->files(config('ifms.paths.wrong'));
+            $matchingFiles = preg_grep('/^' . preg_quote(config('ifms.paths.wrong') . '/' . $fileName, '/') . '/', $list);
             
             $matchedFilename = !empty($matchingFiles) ? end($matchingFiles) : '';
 
@@ -586,8 +605,9 @@ class IfmsSftpIntegrationService implements PaymentSBIIntegrationInterface
     {
         try {
             $doneFileName = $filename . '.xml.done';
-            Storage::disk("ifms_sftp_{$partyCode}")->put(config('ifms.paths.epayment_files_002') . '/' . $doneFileName, '');
-            Storage::disk("ifms_sftp_{$partyCode}")->put(config('ifms.paths.epayment_files_002') . '/ACK/' . $filename . '.xml', $xmlString);
+            Storage::disk("ifms_sftp_{$partyCode}")->put(config('ifms.paths.dotdone') . '/' . $doneFileName, '');
+            $ackXmlString = '<?xml version="1.0" encoding="UTF-8" standalone="no"?><Acknowledgement><FILENAME>' . $filename . '.xml</FILENAME><IFMS_REF_NO>' . date('YmdHis') . '</IFMS_REF_NO></Acknowledgement>';
+            Storage::disk("ifms_sftp_{$partyCode}")->put(config('ifms.paths.ack') . '/ACK' . $filename . '.xml', $ackXmlString);
         } catch (Exception $e) {
             DB::rollback();
             Log::error("Local simulation error: " . $e->getMessage());
@@ -629,6 +649,6 @@ class IfmsSftpIntegrationService implements PaymentSBIIntegrationInterface
             $responseFileName .= '.xml';
         }
         
-        Storage::disk("ifms_sftp_{$partyCode}")->put(config('ifms.paths.epayment_files_005') . '/' . $responseFileName, $resXmlString);
+        Storage::disk("ifms_sftp_{$partyCode}")->put(config('ifms.paths.response') . '/' . $responseFileName, $resXmlString);
     }
 }

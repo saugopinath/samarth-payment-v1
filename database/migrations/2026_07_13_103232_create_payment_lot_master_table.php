@@ -43,7 +43,7 @@ return new class extends Migration
                 scheme_id smallint NOT NULL,
                 payment_mode character varying(10),
                 lot_type_id character varying(10),
-                cur_status character varying(10),
+                cur_status character varying(20),
                 file_name character varying(50) COLLATE pg_catalog.\"default\",
                 created_at timestamp without time zone,
                 updated_at timestamp without time zone,
