@@ -40,7 +40,10 @@ return new class extends Migration
                 ref_no character varying(50),
                 received_ifms_error_file character varying(50),
                 ifms_wrongdata_count integer,
-                utr_no character varying(50),
+                voucher_no bigint,
+                voucher_date date,
+                token_no integer,
+                token_date date, 
                 CONSTRAINT ifms_payment_lot_master_additional_info_pkey PRIMARY KEY (lot_no, lot_year, scheme_id)
             ) PARTITION BY LIST (lot_year);
         ");

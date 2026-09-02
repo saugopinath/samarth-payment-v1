@@ -19,9 +19,12 @@ class IfmsPaymentLotMasterAdditionalInfo extends Model implements Auditable
         'dotdone_status',
         'ack_status',
         'ref_no',
-        'received_ifms_error_file',
         'ifms_wrongdata_count',
-        'utr_no',
+         'voucher_no',
+         'voucher_date',
+         'token_no',
+         'token_date'
+         
     ];
 
     /**
