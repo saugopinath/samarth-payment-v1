@@ -911,38 +911,7 @@ return [
                  "code" => config('payment_lot.status.sbi.generated_pushed_response_received'),
             ),
            
-            array(
-                "name" => "Generated but Yet not Push to IFMS",
-                "short_name" => "payment_lot_status_not_pushed_to_ifms",
-                "parent_short_code" => "payment_lot_status_ifms",
-                 "code" => config('payment_lot.status.ifms.not_pushed_to_ifms'),
-            ),
-            array(
-                "name" => "Acknowledge Pending ",
-                "short_name" => "payment_lot_status_acknowledge_pending",
-                "parent_short_code" => "payment_lot_status_ifms",
-                 "code" => config('payment_lot.status.ifms.acknowledge_pending'),
-            ),
-            array(
-                "name" => "Treasury Response Pending",
-                "short_name" => "payment_lot_status_treasury_response_pending",
-                "parent_short_code" => "payment_lot_status_ifms",
-                 "code" => config('payment_lot.status.ifms.treasury_response_pending'),
-            ),
-            array(
-                "name" => "RBI Report Pending",
-                "short_name" => "payment_lot_status_rbi_report_pending",
-                "parent_short_code" => "payment_lot_status_ifms",
-                 "code" => config('payment_lot.status.ifms.rbi_report_pending'),
-            ),
-            array(
-                "name" => "All Action Done",
-                "short_name" => "payment_lot_status_all_action_done",
-                "parent_short_code" => "payment_lot_status_ifms",
-                 "code" => config('payment_lot.status.ifms.all_action_done'),
-            ),
-        
-           
+
              array(
                 "name" => "Not Generated",
                 "short_name" => "validation_lot_status_not_generated",
@@ -967,6 +936,34 @@ return [
                 "parent_short_code" => "validation_lot_status",
                  "code" => "52204",
             ),
+            array(
+                "name" => "Generated but Yet not Push to IFMS",
+                "short_name" => "payment_lot_status_generated_ifms",
+                "parent_short_code" => "payment_lot_status_ifms",
+                 "code" => config('payment_lot.status.common.generated'),
+            ),
+            array(
+                "name" => "Push to IFMS but Acknowledgement Pending ",
+                "short_name" => "payment_lot_status_push_ifms",
+                "parent_short_code" => "payment_lot_status_ifms",
+                 "code" => config('payment_lot.status.common.push'),
+            ),
+            array(
+                "name" => "Acknowledgement Received but RBI Report Pening ",
+                "short_name" => "payment_lot_status_ack_ifms",
+                "parent_short_code" => "payment_lot_status_ifms",
+                 "code" => config('payment_lot.status.ifms.dotdone'),
+            ),
+            
+           
+            array(
+                "name" => "All Action Done",
+                "short_name" => "payment_lot_status_all_action_done ifms",
+                "parent_short_code" => "payment_lot_status_ifms",
+                 "code" => config('payment_lot.status.common.response'),
+            ),
+        
+           
              array(
                 "name" => "Enable/Disable Payment Lot Create Option",
                 "short_name" => "payment_lot_create_enable_disable",

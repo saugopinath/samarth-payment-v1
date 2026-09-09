@@ -204,7 +204,7 @@ middleware(['auth', 'verified']);
                     
                     $service = \App\Services\Integration\PaymentIntegrationFactory::make($lotNo);
                     $result = $service->checkResponse($lotMaster);
-                    dd($result);
+                    //dd($result);
 
                     if ($result['status'] == 1) {
                         session()->flash('status', $result['msg']);
