@@ -227,6 +227,12 @@ return [
             "code" => $status['ifms']['rbi'],
         ),
         array(
+            "name" => "Ifms Dot Done",
+            "short_name" => "ifms_dotdone",
+            "parent_short_code" => $parent_status_code['ifms'],
+            "code" => $status['ifms']['dotdone'],
+        ),
+        array(
             "name" => "All Action Done",
             "short_name" => "ifms_all_action_done",
             "parent_short_code" => $parent_status_code['ifms'],
