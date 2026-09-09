@@ -5,7 +5,7 @@ namespace App\Services\Contracts;
 use App\Models\PaymentLotMaster;
 use App\Models\SbiPaymentLotMasterAdditionalInfo;
 
-interface PaymentSBIIntegrationInterface
+interface PaymentSBISFTPIntegrationInterface
 {
     /**
      * Prepare the payload (e.g., generate XML or JSON) for the target system.

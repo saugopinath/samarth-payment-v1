@@ -10,7 +10,7 @@ use App\Models\PaymentMainSetting;
 use App\Models\Scheme;
 use App\Models\Codemaster;
 use App\Models\FailedPaymentDetail;
-use App\Services\Contracts\PaymentSBIIntegrationInterface;
+use App\Services\Contracts\PaymentIFMSSFTPIntegrationInterface;
 use Carbon\Carbon;
 use DOMDocument;
 use Illuminate\Support\Facades\DB;
@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use Exception;
 
-class IfmsSftpIntegrationService implements PaymentSBIIntegrationInterface
+class IfmsSftpIntegrationService implements PaymentIFMSSFTPIntegrationInterface
 {
     private static $instance = null;
 

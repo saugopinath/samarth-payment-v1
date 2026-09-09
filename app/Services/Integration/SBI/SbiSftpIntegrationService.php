@@ -9,11 +9,11 @@ use Exception;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\File;
 use App\Models\SbiPaymentLotMasterAdditionalInfo;
-use App\Services\Contracts\PaymentSBIIntegrationInterface;
+use App\Services\Contracts\PaymentSBISFTPIntegrationInterface;
 use App\Helpers\XmlSigner;
 use App\Helpers\SBIEncryptDecrypt;
 
-class SbiSftpIntegrationService implements PaymentSBIIntegrationInterface
+class SbiSftpIntegrationService implements PaymentSBISFTPIntegrationInterface
 {
     private static $instance = null;
     
