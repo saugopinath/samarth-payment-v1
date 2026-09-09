@@ -184,7 +184,7 @@ middleware(['auth', 'verified']);
                     
                     $service = \App\Services\Integration\PaymentIntegrationFactory::make($lotNo);
                     $result = $service->checkAcknowledge($lotMaster);
-                    dd($result);
+                   // dd($result);
                     if ($result['status'] == 1) {
                         session()->flash('status', $result['msg']);
                     } else if (in_array($result['status'], [2, 3, 4])) {

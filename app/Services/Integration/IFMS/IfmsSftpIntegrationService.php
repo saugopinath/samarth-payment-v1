@@ -39,6 +39,8 @@ class IfmsSftpIntegrationService implements PaymentSBIIntegrationInterface
     public function pushToTarget(PaymentLotMaster $lotMaster): bool
     {
         set_time_limit(0);
+        DB::connection('pgsql_payment')->beginTransaction();
+        DB::connection('pgsql_ifms')->beginTransaction();
         try {
             $lotNo = $lotMaster->lot_no;
             $schemeId = $lotMaster->scheme_id;
@@ -93,44 +95,51 @@ class IfmsSftpIntegrationService implements PaymentSBIIntegrationInterface
             if (!Storage::exists("{$pushedPath}/{$partyCode}")) {
                 Storage::makeDirectory("{$pushedPath}/{$partyCode}");
             }
-            Storage::put("{$pushedPath}/{$partyCode}/{$filename}.xml", $xmlString);
+            $isPutLocal = Storage::put("{$pushedPath}/{$partyCode}/{$filename}.xml", $xmlString);
 
-            if (app()->environment('local')) {
-                $this->simulateLocalEnvironment($partyCode, $filename, $fileNameFromDb, $xmlString, $drnFull, $benData);
-            }
-            
-            Storage::disk("ifms_sftp_{$partyCode}")->put(config('ifms.paths.xmlpush') . '/' . $filename . '.xml', $xmlString);
+            if ($isPutLocal) {
+                if (app()->environment('local')) {
+                    $this->simulateLocalEnvironment($partyCode, $filename, $fileNameFromDb, $xmlString, $drnFull, $benData);
+                }
+                
+                Storage::disk("ifms_sftp_{$partyCode}")->put(config('ifms.paths.xmlpush') . '/' . $filename . '.xml', $xmlString);
 
-            // simulated or could be: $ifmsDisk->exists(...)
-            $exists = true; 
-            
-            if ($exists) {
-                DB::beginTransaction();
-                try {
+                $exists = Storage::disk("ifms_sftp_{$partyCode}")->exists(config('ifms.paths.xmlpush') . '/' . $filename . '.xml');
+                
+                if ($exists) {
                     $lotMaster->file_name = $filename;
                     $lotMaster->cur_status = config('payment_lot.status.common.push');
                     $lotMaster->payment_push_date = now();
-                    $lotMaster->save();
+                    $is_save_main = $lotMaster->save();
 
-                    IfmsPaymentLotMasterAdditionalInfo::updateOrCreate(
+                    $is_save_add = IfmsPaymentLotMasterAdditionalInfo::updateOrCreate(
                         [
                             'lot_no' => $lotMaster->lot_no,
                             'scheme_id' => $lotMaster->scheme_id,
                             'lot_year' => $lotMaster->lot_year,
                         ]
                     );
-
-                    DB::commit();
-                    return true;
-                } catch (Exception $e) {
-                    DB::rollback();
-                    Log::error("Failed to update lot status after push: " . $e->getMessage());
-                    return false;
+                    
+                    if ($is_save_main && $is_save_add) {
+                        DB::connection('pgsql_payment')->commit();
+                        DB::connection('pgsql_ifms')->commit();
+                        return true;
+                    } else {
+                        DB::connection('pgsql_payment')->rollback();
+                        DB::connection('pgsql_ifms')->rollback();
+                        return false;
+                    }
                 }
+            } else {
+                Log::error("Failed to write XML file to local storage: {$pushedPath}/{$partyCode}/{$filename}.xml");
             }
 
+            DB::connection('pgsql_payment')->rollback();
+            DB::connection('pgsql_ifms')->rollback();
             return false;
         } catch (Exception $e) {
+            DB::connection('pgsql_payment')->rollback();
+                      DB::connection('pgsql_ifms')->rollback();
             Log::error("Exception in pushToTarget: " . $e->getMessage());
             return false;
         }
@@ -167,8 +176,30 @@ class IfmsSftpIntegrationService implements PaymentSBIIntegrationInterface
 
             $exists = Storage::disk("ifms_sftp_{$partyCode}")->exists(config('ifms.paths.dotdone') . '/' . $fileName . '.xml.done');
             if ($exists) {
+                $remoteFile = Storage::disk("ifms_sftp_{$partyCode}")->get(config('ifms.paths.dotdone') . '/' . $fileName . '.xml.done');
+                $dotdonePath = config('ifms.local_paths.dotdone');
+                
+                $localDotdoneFilePath = storage_path("{$dotdonePath}/{$partyCode}/{$fileName}.xml.done");
+                if (!file_exists(dirname($localDotdoneFilePath))) {
+                    mkdir(dirname($localDotdoneFilePath), 0775, true);
+                }
+                file_put_contents($localDotdoneFilePath, $remoteFile);
+
+                if (!Storage::exists("{$dotdonePath}/{$partyCode}")) {
+                    Storage::makeDirectory("{$dotdonePath}/{$partyCode}");
+                }
+                if(!Storage::put("{$dotdonePath}/{$partyCode}/{$fileName}.xml.done", $remoteFile)){
+                    return [
+                        'status' => 2, 
+                        'msg' => 'Dotdone file is not available for lot no. ' . $lotNo . '.',
+                        'type' => 'red', 
+                        'icon' => 'fa fa-check', 
+                        'title' => 'Failed'
+                    ];
+                }
+
                 $lotMaster->cur_status = config('payment_lot.status.ifms.dotdone'); // GENERATED, PUSHED AND RESPONSE RECEIVED
-                $lotMaster->save();
+                if($lotMaster->save()){
                 
                 return [
                     'status' => 1, 
@@ -177,6 +208,16 @@ class IfmsSftpIntegrationService implements PaymentSBIIntegrationInterface
                     'icon' => 'fa fa-check', 
                     'title' => 'Success'
                 ];
+            }
+            else{
+                return [
+                    'status' => 2, 
+                    'msg' => 'Lot no. ' . $lotNo . ' could not be verified dotDone status.',
+                    'type' => 'red', 
+                    'icon' => 'fa fa-check', 
+                    'title' => 'Failed'
+                ];
+            }
             } else {
                 return [
                     'status' => 3, 
@@ -264,16 +305,56 @@ class IfmsSftpIntegrationService implements PaymentSBIIntegrationInterface
                 if (!Storage::exists("{$ackPath}/{$partyCode}")) {
                     Storage::makeDirectory("{$ackPath}/{$partyCode}");
                 }
-                Storage::put("{$ackPath}/{$partyCode}/{$fileName}", $remoteFile);
+                if(!Storage::put("{$ackPath}/{$partyCode}/{$fileName}", $remoteFile)){
+                    return [
+                        'status' => 2, 
+                        'msg' => 'Ack file is not available for lot no. ' . $lotNo . '.',
+                        'type' => 'red', 
+                        'icon' => 'fa fa-check', 
+                        'title' => 'Failed'
+                    ];
+                }
                 $remoteXmlFile = simplexml_load_string($remoteFile);
 
                 $ifmsRefNo = (string)$remoteXmlFile->IFMS_REF_NO;
                // dd($ifmsRefNo);
-                $lotMaster->cur_status = config('payment_lot.status.common.ack');
-                $lotMaster->save();
-                $lotInfo = \App\Models\IfmsPaymentLotMasterAdditionalInfo::where('lot_no', $lotNo)->firstOrFail();
-                $lotInfo->ref_no = $ifmsRefNo;
-                $lotInfo->save();
+                DB::connection('pgsql_payment')->beginTransaction();
+                DB::connection('pgsql_ifms')->beginTransaction();
+
+                try {
+                    $lotMaster->cur_status = config('payment_lot.status.common.ack');
+                    $is_save_main = $lotMaster->save();
+                    
+                    $lotInfo = \App\Models\IfmsPaymentLotMasterAdditionalInfo::where('lot_no', $lotNo)->firstOrFail();
+                    $lotInfo->ref_no = $ifmsRefNo;
+                    $is_save_add = $lotInfo->save();
+
+                    if ($is_save_main && $is_save_add) {
+                        DB::connection('pgsql_payment')->commit();
+                        DB::connection('pgsql_ifms')->commit();
+                    } else {
+                        DB::connection('pgsql_payment')->rollback();
+                        DB::connection('pgsql_ifms')->rollback();
+                        return [
+                            'status' => 2, 
+                            'msg' => 'Database update failed while saving Ack details.',
+                            'type' => 'red', 
+                            'icon' => 'fa fa-warning', 
+                            'title' => 'Error'
+                        ];
+                    }
+                } catch (Exception $ex) {
+                    DB::connection('pgsql_payment')->rollback();
+                    DB::connection('pgsql_ifms')->rollback();
+                    Log::error("Database transaction failed in checkAcknowledge: " . $ex->getMessage());
+                    return [
+                        'status' => 2, 
+                        'msg' => 'Exception during database update: ' . $ex->getMessage(),
+                        'type' => 'red', 
+                        'icon' => 'fa fa-warning', 
+                        'title' => 'Error'
+                    ];
+                }
                 //$wrongFileStatus = $this->wrong_file_status($partyCode, $fileName, $schemeId, $lotNo);
                 //dd($wrongFileStatus);
                 $wrongFileStatus='1';
@@ -451,7 +532,15 @@ class IfmsSftpIntegrationService implements PaymentSBIIntegrationInterface
             if (!Storage::exists("{$rbiRespPath}/{$partyCode}")) {
                 Storage::makeDirectory("{$rbiRespPath}/{$partyCode}");
             }
-            Storage::put("{$rbiRespPath}/{$partyCode}/{$fileName1}", $remoteFile);
+           if(!Storage::put("{$rbiRespPath}/{$partyCode}/{$fileName1}", $remoteFile)){
+            return [
+                'status' => 2, 
+                'msg' => 'Rbi response file is not available for lot no. ' . $lotNo . '.',
+                'type' => 'red', 
+                'icon' => 'fa fa-check', 
+                'title' => 'Failed'
+            ];
+           }
             
             $remoteXmlFile = simplexml_load_string($remoteFile);	
             $voucherNo = (string)$remoteXmlFile->voucherNo;
@@ -464,69 +553,107 @@ class IfmsSftpIntegrationService implements PaymentSBIIntegrationInterface
             $successAmount = 0;
             $failedAmount = 0;
             
-            foreach ($remoteXmlFile->beneficiaryDetail as $detailXml) {
-                // In original code, it looped through XML structure in a nested array logic. 
-                // Using simplexml properly:
-                $status = (string)$detailXml->status;
-                $refBenfId = (string)$detailXml->refBenfId;
-                $utrNo = (string)$detailXml->utrNo;
-                $reason = (string)$detailXml->reason;
-                $amount = (string)$detailXml->amount;
-                if ($status == 'Success') {
-                    $successCount++;
-                     $successAmount += $amount;
-                } elseif ($status == 'Failed') {
-                    $failedCount++;
-                     $failedAmount += $amount;
-                    $codemasterStatus = Codemaster::where('short_name', $status)
-                        ->where('parent_short_code', 'ifms_status_code')
-                        ->first();
-                    $mappedStatusCode = $codemasterStatus ? $codemasterStatus->code : 'FAILED';
+            DB::connection('pgsql_payment')->beginTransaction();
+            DB::connection('pgsql_ifms')->beginTransaction();
+            $failed_update=0;
+            $success_update=0;
+
+            try {
+                foreach ($remoteXmlFile->beneficiaryDetail as $detailXml) {
+                    // In original code, it looped through XML structure in a nested array logic. 
+                    // Using simplexml properly:
+                    $status = (string)$detailXml->status;
+                    $refBenfId = (string)$detailXml->refBenfId;
+                    $utrNo = (string)$detailXml->utrNo;
+                    $reason = (string)$detailXml->reason;
+                    $amount = (string)$detailXml->amount;
+                    if ($status == 'Success') {
+                        $successCount++;
+                         $successAmount += $amount;
+                    } elseif ($status == 'Failed') {
+                        $failedCount++;
+                         $failedAmount += $amount;
+                        $codemasterStatus = Codemaster::where('short_name', $status)
+                            ->where('parent_short_code', 'ifms_status_code')
+                            ->first();
+                        $mappedStatusCode = $codemasterStatus ? $codemasterStatus->code : 'FAILED';
+                        
+                        if(FailedPaymentDetail::create([
+                            'lot_no' => $lotMaster->lot_no,
+                            'ben_id' => $refBenfId,
+                            'scheme_id' => $schemeId,
+                            'status_code' => $mappedStatusCode,
+                            'remarks' => $reason,
+                            'failed_type' => $failedTypeCode,
+                            'failed_source' => $sbiSourceCode
+                        ])){
+                            $failed_update++;
+                        }
+                    }
                     
-                    FailedPaymentDetail::create([
-                        'lot_no' => $lotMaster->lot_no,
-                        'ben_id' => $refBenfId,
-                        'scheme_id' => $schemeId,
-                        'status_code' => $mappedStatusCode,
-                        'remarks' => $reason,
-                        'failed_type' => $failedTypeCode,
-                        'failed_source' => $sbiSourceCode
-                    ]);
-                }
-                
-                $detail = IfmsTransactionLotDetail::where('lot_no', $lotMaster->lot_no)
-                    ->where('scheme_id', $schemeId)
-                    ->where('ben_id', $refBenfId)
-                    ->first();
-
-                if ($detail) {
-                    $codemasterStatus = Codemaster::where('short_name', $status)
-                        ->where('parent_short_code', 'ifms_status_code')
+                    $detail = IfmsTransactionLotDetail::where('lot_no', $lotMaster->lot_no)
+                        ->where('scheme_id', $schemeId)
+                        ->where('ben_id', $refBenfId)
                         ->first();
-                    // Original code mapped `$credit_status` which was undefined. Fallback to `$status`
-                    $mappedStatusCode = $codemasterStatus ? $codemasterStatus->code : $status; 
 
-                    $detail->utr_no = $utrNo;
-                   
-                    $detail->save();
+                    if ($detail) {
+                        $codemasterStatus = Codemaster::where('short_name', $status)
+                            ->where('parent_short_code', 'ifms_status_code')
+                            ->first();
+                        // Original code mapped `$credit_status` which was undefined. Fallback to `$status`
+                        $mappedStatusCode = $codemasterStatus ? $codemasterStatus->code : $status; 
+
+                        $detail->utr_no = $utrNo;
+                       
+                        if($detail->save()){
+                            $success_update++;
+                        }
+                    }
                 }
+                $lotMaster->success_count = $successCount;
+                $lotMaster->failed_count = $failedCount;
+                $lotMaster->success_amount = $successAmount;
+                $lotMaster->failed_amount = $failedAmount;
+                $lotMaster->cur_status = config('payment_lot.status.common.response');
+                $is_save_main = $lotMaster->save();
+
+                $lotInfo = \App\Models\IfmsPaymentLotMasterAdditionalInfo::where('lot_no', $lotNo)->firstOrFail();
+                $lotInfo->voucher_no = $voucherNo;
+                $lotInfo->voucher_date = $voucherDate;
+                $lotInfo->token_no = $tokenNo;
+                $lotInfo->token_date = $tokenDate;
+                $is_save_add = $lotInfo->save();
+
+                if ($is_save_main && $is_save_add && (($failed_update+$success_update) == ($failedCount+$successCount))) {
+                    DB::connection('pgsql_payment')->commit();
+                    DB::connection('pgsql_ifms')->commit();
+                    return [
+                        'status' => 1, 'msg' => 'RBI Report Imported Successfully for Lot No. ' . $lotNo . '.',
+                        'type' => 'green', 'icon' => 'fa fa-check', 'title' => 'Success'
+                    ];
+                } else {
+                    DB::connection('pgsql_payment')->rollback();
+                    DB::connection('pgsql_ifms')->rollback();
+                    return [
+                        'status' => 2, 
+                        'msg' => 'Database update failed while saving RBI response details.',
+                        'type' => 'red', 
+                        'icon' => 'fa fa-warning', 
+                        'title' => 'Error'
+                    ];
+                }
+            } catch (Exception $ex) {
+                DB::connection('pgsql_payment')->rollback();
+                DB::connection('pgsql_ifms')->rollback();
+                Log::error("Database transaction failed in checkResponse: " . $ex->getMessage());
+                return [
+                    'status' => 2, 
+                    'msg' => 'Exception during database update: ' . $ex->getMessage(),
+                    'type' => 'red', 
+                    'icon' => 'fa fa-warning', 
+                    'title' => 'Error'
+                ];
             }
-            $lotMaster->success_count = $successCount;
-            $lotMaster->failed_count = $failedCount;
-            $lotMaster->success_amount = $successAmount;
-            $lotMaster->failed_amount = $failedAmount;
-            $lotMaster->cur_status = config('payment_lot.status.common.response');
-            $lotMaster->save();
-            $lotInfo = \App\Models\IfmsPaymentLotMasterAdditionalInfo::where('lot_no', $lotNo)->firstOrFail();
-            $lotInfo->voucher_no = $voucherNo;
-            $lotInfo->voucher_date = $voucherDate;
-            $lotInfo->token_no = $tokenNo;
-            $lotInfo->token_date = $tokenDate;
-            $lotInfo->save();
-            return [
-					'status' => 1, 'msg' => 'RBI Report Imported Successfully for Lot No. ' . $lotNo . '.',
-					'type' => 'green', 'icon' => 'fa fa-check', 'title' => 'Success'
-				];
         } catch (Exception $e) {
             Log::error("Exception in checkResponse: " . $e->getMessage());
             return [
@@ -640,7 +767,7 @@ class IfmsSftpIntegrationService implements PaymentSBIIntegrationInterface
             return $returnStatus ?: 'No Wrong Data File Received';
             
         } catch (Exception $e) {
-            dd($e);
+            //dd($e);
             Log::error("Exception in wrong_file_status: " . $e->getMessage());
             return 'Exception during processing wrong file data.';
         }
@@ -689,7 +816,6 @@ class IfmsSftpIntegrationService implements PaymentSBIIntegrationInterface
             $ackXmlString = '<?xml version="1.0" encoding="UTF-8" standalone="no"?><Acknowledgement><FILENAME>' . $filename . '.xml</FILENAME><IFMS_REF_NO>' . date('YmdHis') . '</IFMS_REF_NO></Acknowledgement>';
             Storage::disk("ifms_sftp_{$partyCode}")->put(config('ifms.paths.ack') . '/ACK' . $filename . '.xml', $ackXmlString);
         } catch (Exception $e) {
-            DB::rollback();
             Log::error("Local simulation error: " . $e->getMessage());
         }
         
@@ -726,8 +852,6 @@ class IfmsSftpIntegrationService implements PaymentSBIIntegrationInterface
         $resXmlString = $resXml->saveXML();
         $baseName = preg_replace('/\.xml$/i', '', $fileNameFromDb ?: $filename);
         $responseFileName = $partyCode . $baseName . '_00234.xml';
-
-        
         Storage::disk("ifms_sftp_{$partyCode}")->put(config('ifms.paths.response') . '/' . $responseFileName, $resXmlString);
     }
 }

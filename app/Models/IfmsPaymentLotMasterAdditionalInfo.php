@@ -10,7 +10,7 @@ class IfmsPaymentLotMasterAdditionalInfo extends Model implements Auditable
 {
     use AuditableTrait;
 
-    protected $connection = 'pgsql_payment';
+    protected $connection = 'pgsql_ifms';
     protected $table = 'ifms.payment_lot_master_additional_info';
     protected $fillable = [
         'lot_no',
