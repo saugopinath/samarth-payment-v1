@@ -1,19 +1,11 @@
 <?php
 
-namespace App\Services;
+namespace App\Contracts\Repositories;
 
-use App\Contracts\Repositories\PaymentLotRepositoryInterface;
 use App\Models\PaymentLotMaster;
 
-class PaymentLotService
+interface PaymentLotRepositoryInterface
 {
-    protected $paymentLotRepository;
-
-    public function __construct(PaymentLotRepositoryInterface $paymentLotRepository)
-    {
-        $this->paymentLotRepository = $paymentLotRepository;
-    }
-
     /**
      * Generate the transaction lot records for the given payment mode.
      *
@@ -34,17 +26,7 @@ class PaymentLotService
         string $paymentType,
         string $targetPaymentMode,
         array $filters = []
-    ): bool {
-        return $this->paymentLotRepository->generateTransactionLot(
-            $lotMaster,
-            $schemeId,
-            $financialYear,
-            $lotMonth,
-            $paymentType,
-            $targetPaymentMode,
-            $filters
-        );
-    }
+    ): bool;
 
     /**
      * Preview the transaction lot records for the given criteria.
@@ -66,15 +48,5 @@ class PaymentLotService
         string $targetPaymentMode,
         string $lotTypeId,
         array $filters = []
-    ): array {
-        return $this->paymentLotRepository->previewTransactionLot(
-            $schemeId,
-            $financialYear,
-            $lotMonth,
-            $paymentType,
-            $targetPaymentMode,
-            $lotTypeId,
-            $filters
-        );
-    }
+    ): array;
 }
