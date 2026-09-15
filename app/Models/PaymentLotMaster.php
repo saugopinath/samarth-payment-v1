@@ -30,7 +30,8 @@ class PaymentLotMaster extends Model implements Auditable
         'failed_count',
         'success_amount',
         'failed_amount',
-		'cur_status'
+		'cur_status',
+        'int_type'
 	];
 
     public function sbiPaymentLotMasterAdditionalInfo()

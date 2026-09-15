@@ -8,11 +8,13 @@ class SignLotCommand implements PaymentStepCommand
 {
     public function execute($lot, array $data = []): array
     {
-        // TODO: Implement SBI lot signing logic
+        // DEV MOCK: Update lot status to signed
+        $lot->cur_status = config('payment_lot.status.sbi.signed');
+        $lot->save();
         
         return [
-            'status' => 1,
-            'msg' => 'Lot signed successfully via SBI logic.',
+            'status' => 'success',
+            'message' => 'Lot signed successfully (Dev Mock).',
             'type' => 'green'
         ];
     }

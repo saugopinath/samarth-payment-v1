@@ -8,11 +8,13 @@ class PushToIfmsCommand implements PaymentStepCommand
 {
     public function execute($lot, array $data = []): array
     {
-        // TODO: Implement SFTP push logic to IFMS
+        // DEV MOCK: Update lot status to pushed
+        $lot->cur_status = config('payment_lot.status.common.push');
+        $lot->save();
         
         return [
-            'status' => 1,
-            'msg' => 'Successfully pushed to IFMS.',
+            'status' => 'success',
+            'message' => 'Successfully pushed to IFMS (Dev Mock).',
             'type' => 'green'
         ];
     }

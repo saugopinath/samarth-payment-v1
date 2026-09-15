@@ -8,11 +8,13 @@ class PushCommand implements PaymentStepCommand
 {
     public function execute($lot, array $data = []): array
     {
-        // TODO: Implement Bandhan push logic
+        // DEV MOCK: Update lot status to pushed
+        $lot->cur_status = config('payment_lot.status.common.push');
+        $lot->save();
         
         return [
-            'status' => 1,
-            'msg' => 'Lot pushed successfully via Bandhan logic.',
+            'status' => 'success',
+            'message' => 'Lot pushed successfully via Bandhan (Dev Mock).',
             'type' => 'green'
         ];
     }

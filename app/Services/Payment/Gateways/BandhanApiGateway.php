@@ -6,7 +6,14 @@ class BandhanApiGateway extends AbstractPaymentGateway
 {
     protected function getStatusKey($lot): string
     {
-        return (string)($lot->cur_status ?? 'generated');
+        $status = $lot->cur_status;
+        if ($status == config('payment_lot.status.common.generated')) return 'generated';
+        if ($status == config('payment_lot.status.common.push')) return 'pushed';
+        if ($status == config('payment_lot.status.common.ack')) return 'ack_received';
+        if ($status == config('payment_lot.status.common.response')) return 'response_received';
+        if ($status == config('payment_lot.status.common.defunct')) return 'completed';
+        
+        return (string)($status ?? 'generated');
     }
 
     protected function getActionMap(): array

@@ -6,10 +6,16 @@ class IfmsApiGateway extends AbstractPaymentGateway
 {
     protected function getStatusKey($lot): string
     {
-        if ($lot->cur_status == config('payment_lot.status.common.generated', 'generated')) {
-            return 'generated';
-        }
-        return "{$lot->lot_status}_{$lot->bill_status}_{$lot->push_to_ifms_status}";
+        $status = $lot->cur_status;
+        if ($status == config('payment_lot.status.common.generated')) return 'generated';
+        if ($status == 'PLSIFMS_BILL_GEN') return 'bill_generated';
+        if ($status == 'PLSIFMS_BEN_PUSH') return 'ben_pushed';
+        if ($status == 'PLSIFMS_BILL_STATUS') return 'bill_status_received';
+        if ($status == 'PLSIFMS_RESP_RECV') return 'response_received';
+        if ($status == 'PLSIFMS_RESP_IMP') return 'response_imported';
+        if ($status == config('payment_lot.status.common.defunct')) return 'completed';
+
+        return (string)($status ?? 'generated');
     }
 
     protected function getActionMap(): array
@@ -18,19 +24,19 @@ class IfmsApiGateway extends AbstractPaymentGateway
             'generated' => [
                 ['key' => 'bill_generation', 'label' => 'Bill Generation (1)', 'color' => 'blue']
             ],
-            '1_1_0' => [
+            'bill_generated' => [
                 ['key' => 'beneficiary_push', 'label' => 'Beneficiary send To IFMS (2)', 'color' => 'yellow']
             ],
-            '0_2_1' => [
+            'ben_pushed' => [
                 ['key' => 'check_bill_status', 'label' => 'Bill Status Received (3)', 'color' => 'green']
             ],
-            '0_3_1' => [
+            'bill_status_received' => [
                 ['key' => 'receive_response', 'label' => 'Receive Response (4)', 'color' => 'blue']
             ],
-            '0_4_1' => [
+            'response_received' => [
                 ['key' => 'import_response', 'label' => 'Import Response (5)', 'color' => 'yellow']
             ],
-            'completed' => [
+            'response_imported' => [
                 ['key' => 'defunc', 'label' => 'Defunc Lot (6)', 'color' => 'red']
             ]
         ];
@@ -39,11 +45,11 @@ class IfmsApiGateway extends AbstractPaymentGateway
     protected function resolveCommandClass(string $actionKey): ?string
     {
         $map = [
-            'bill_generation' => \App\Services\Payment\Commands\Ifms\BillGenerationCommand::class,
-            'beneficiary_push' => \App\Services\Payment\Commands\Ifms\BeneficiaryPushCommand::class,
-            'check_bill_status' => \App\Services\Payment\Commands\Ifms\CheckBillStatusCommand::class,
-            'receive_response' => \App\Services\Payment\Commands\Ifms\ReceiveResponseCommand::class,
-            'import_response' => \App\Services\Payment\Commands\Ifms\ImportResponseCommand::class,
+            'bill_generation' => \App\Services\Payment\Commands\IfmsApi\BillGenerationCommand::class,
+            'beneficiary_push' => \App\Services\Payment\Commands\IfmsApi\BeneficiaryPushCommand::class,
+            'check_bill_status' => \App\Services\Payment\Commands\IfmsApi\CheckBillStatusCommand::class,
+            'receive_response' => \App\Services\Payment\Commands\IfmsApi\ReceiveResponseCommand::class,
+            'import_response' => \App\Services\Payment\Commands\IfmsApi\ImportResponseCommand::class,
             'defunc' => \App\Services\Payment\Commands\Common\DefunctLotCommand::class,
         ];
         return $map[$actionKey] ?? null;

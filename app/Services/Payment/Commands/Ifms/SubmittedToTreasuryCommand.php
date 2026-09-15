@@ -8,11 +8,13 @@ class SubmittedToTreasuryCommand implements PaymentStepCommand
 {
     public function execute($lot, array $data = []): array
     {
-        // TODO: Implement logic to check if submitted to treasury
+        // DEV MOCK: Update lot status to treasury
+        $lot->cur_status = config('payment_lot.status.ifms.treasury');
+        $lot->save();
         
         return [
-            'status' => 1,
-            'msg' => 'Successfully submitted to treasury.',
+            'status' => 'success',
+            'message' => 'Successfully submitted to treasury (Dev Mock).',
             'type' => 'green'
         ];
     }

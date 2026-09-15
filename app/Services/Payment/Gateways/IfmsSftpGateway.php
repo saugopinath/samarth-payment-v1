@@ -6,24 +6,31 @@ class IfmsSftpGateway extends AbstractPaymentGateway
 {
     protected function getStatusKey($lot): string
     {
-        // For SFTP, we might rely on different status codes, but we map them to string keys for clarity
-        return (string)($lot->cur_status ?? 'generated');
+        $status = $lot->cur_status;
+        if ($status == config('payment_lot.status.common.generated')) return 'generated';
+        if ($status == config('payment_lot.status.common.push')) return 'pushed';
+        if ($status == config('payment_lot.status.ifms.dotdone')) return 'dotdone';
+        if ($status == config('payment_lot.status.ifms.treasury')) return 'treasury';
+        if ($status == config('payment_lot.status.ifms.rbi')) return 'rbi';
+        if ($status == config('payment_lot.status.common.defunct')) return 'completed';
+
+        return (string)($status ?? 'generated');
     }
 
     protected function getActionMap(): array
     {
         return [
             'generated' => [
-                ['key' => 'push_to_ifms', 'label' => 'Push to IFMS (1)', 'color' => 'blue']
+                ['key' => 'push_ifms', 'label' => 'Push To IFMS (1)', 'color' => 'blue']
             ],
             'pushed' => [
-                ['key' => 'ifms_received', 'label' => 'IFMS Received (2)', 'color' => 'purple']
+                ['key' => 'check_dotdone', 'label' => 'Check IFMS Ack (2)', 'color' => 'yellow']
             ],
-            'received' => [
-                ['key' => 'submitted_to_treasury', 'label' => 'Submitted To Treasury (3)', 'color' => 'indigo']
+            'dotdone' => [
+                ['key' => 'check_treasury', 'label' => 'Check Treasury (3)', 'color' => 'green']
             ],
-            'treasury_submitted' => [
-                ['key' => 'import_rbi_report', 'label' => 'Import RBI Report (4)', 'color' => 'yellow']
+            'treasury' => [
+                ['key' => 'check_rbi', 'label' => 'Import RBI Report (4)', 'color' => 'indigo']
             ],
             'completed' => [
                 ['key' => 'defunc', 'label' => 'Defunc Lot (5)', 'color' => 'red']
@@ -34,10 +41,10 @@ class IfmsSftpGateway extends AbstractPaymentGateway
     protected function resolveCommandClass(string $actionKey): ?string
     {
         $map = [
-            'push_to_ifms' => \App\Services\Payment\Commands\Ifms\PushToIfmsCommand::class,
-            'ifms_received' => \App\Services\Payment\Commands\Ifms\IfmsReceivedCommand::class,
-            'submitted_to_treasury' => \App\Services\Payment\Commands\Ifms\SubmittedToTreasuryCommand::class,
-            'import_rbi_report' => \App\Services\Payment\Commands\Ifms\ImportRbiReportCommand::class,
+            'push_ifms' => \App\Services\Payment\Commands\Ifms\PushToIfmsCommand::class,
+            'check_dotdone' => \App\Services\Payment\Commands\Ifms\IfmsReceivedCommand::class,
+            'check_treasury' => \App\Services\Payment\Commands\Ifms\SubmittedToTreasuryCommand::class,
+            'check_rbi' => \App\Services\Payment\Commands\Ifms\ImportRbiReportCommand::class,
             'defunc' => \App\Services\Payment\Commands\Common\DefunctLotCommand::class,
         ];
         return $map[$actionKey] ?? null;

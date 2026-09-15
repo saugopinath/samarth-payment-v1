@@ -46,6 +46,7 @@ middleware(['auth', 'verified']);
                 'ward_id' => '',
                 'limit' => '',
                 'previewSummary' => null,
+                'int_type' => '',
             ]);
 
             $updatedScheme = function ($value) {
@@ -59,11 +60,13 @@ middleware(['auth', 'verified']);
                 $this->lot_month = '';
                 $this->lot_type = '';
                 $this->target_payment_mode = '';
+                $this->int_type = '';
             };
 
             $updatedLotMonth = function ($value) {
                 $this->lot_type = '';
                 $this->target_payment_mode = '';
+                $this->int_type = '';
                 
                 if ($this->scheme && $this->lot_financial_year && $this->lot_month) {
                     $setting = \App\Models\PaymentMainSetting::where('scheme_id', $this->scheme)
@@ -79,6 +82,9 @@ middleware(['auth', 'verified']);
                             }
                             if (!empty($monthData['payment_type'])) {
                                 $this->payment_type = $monthData['payment_type'];
+                            }
+                            if (!empty($monthData['integration_type'])) {
+                                $this->int_type = $monthData['integration_type'];
                             }
 
                             $createOptionCode = config('payment_lot.configuration_codes.create_enable_disable');
@@ -321,6 +327,7 @@ middleware(['auth', 'verified']);
                     'gp_id',
                     'ward_id',
                     'limit',
+                    'int_type',
                 ]);
                 
                 // Set default values back
@@ -408,6 +415,7 @@ middleware(['auth', 'verified']);
                         'payment_mode' => $this->target_payment_mode,
                         'lot_type_id' => $this->lot_type,
                         'cur_status' => config('payment_lot.status.common.generated'),
+                        'int_type' => $this->int_type,
                     ]);
 
                     $success = $service->generateTransactionLot(

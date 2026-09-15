@@ -8,11 +8,13 @@ class IfmsReceivedCommand implements PaymentStepCommand
 {
     public function execute($lot, array $data = []): array
     {
-        // TODO: Implement IFMS receive acknowledgement logic
+        // DEV MOCK: Update lot status to dotdone
+        $lot->cur_status = config('payment_lot.status.ifms.dotdone');
+        $lot->save();
         
         return [
-            'status' => 1,
-            'msg' => 'Received acknowledgement from IFMS.',
+            'status' => 'success',
+            'message' => 'Received dotdone acknowledgement from IFMS (Dev Mock).',
             'type' => 'green'
         ];
     }

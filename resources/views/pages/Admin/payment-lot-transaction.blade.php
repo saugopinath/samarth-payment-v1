@@ -19,6 +19,7 @@ middleware(['auth', 'verified']);
         <?php
             use function Livewire\Volt\{state, with, updated};
             use App\Models\Scheme;
+            use App\Models\Codemaster;
             use App\Models\FinancialYear;
             use App\Models\Month;
             use App\Models\PaymentLotMaster;
@@ -27,32 +28,59 @@ middleware(['auth', 'verified']);
                 'scheme_id' => '',
                 'lot_financial_year' => '',
                 'lot_month' => '',
+                'payment_type' => '',
+                'lot_type' => '',
+                'target_payment_mode' => '',
+                'has_searched' => false,
             ]);
 
             with(function () {
                 $schemes = Scheme::where('is_active', true)->get();
                 $financialYears = FinancialYear::where('is_active', true)->orderBy('name')->pluck('name', 'code')->toArray();
                 $months = Month::where('is_active', true)->orderBy('display_order')->pluck('name', 'code')->toArray();
+                $paymentTypes = Codemaster::where('parent_short_code', 'payment_type')->where('is_active', true)->pluck('name', 'code')->toArray();
+                $lotTypes = Codemaster::where('parent_short_code', 'lot_type')->where('is_active', true)->pluck('name', 'code')->toArray();
+                $paymentModes = Codemaster::where('parent_short_code', 'payment_mode')->where('is_active', true)->pluck('name', 'code')->toArray();
 
-                $query = PaymentLotMaster::query();
+                if ($this->has_searched) {
+                    $query = PaymentLotMaster::query();
+                    
+                    if ($this->scheme_id) {
+                        $query->where('scheme_id', $this->scheme_id);
+                    }
+                    if ($this->lot_financial_year) {
+                        $query->where('lot_year', $this->lot_financial_year);
+                    }
+                    if ($this->lot_month) {
+                        $query->where('lot_month', $this->lot_month);
+                    }
+                    if ($this->lot_type) {
+                        $query->where('lot_type_id', $this->lot_type);
+                    }
+                    if ($this->target_payment_mode) {
+                        $query->where('payment_mode', $this->target_payment_mode);
+                    }
+
+                    $lots = $query->orderBy('created_at', 'desc')->get();
+                } else {
+                    $lots = collect();
+                }
                 
-                if ($this->scheme_id) {
-                    $query->where('scheme_id', $this->scheme_id);
-                }
-                if ($this->lot_financial_year) {
-                    $query->where('lot_year', $this->lot_financial_year);
-                }
-                if ($this->lot_month) {
-                    $query->where('lot_month', $this->lot_month);
-                }
+                $allCodeMap = Codemaster::pluck('name', 'code')->toArray();
 
-                $lots = $query->orderBy('created_at', 'desc')->get();
-
-                return compact('schemes', 'financialYears', 'months', 'lots');
+                return compact('schemes', 'financialYears', 'months', 'paymentTypes', 'lotTypes', 'paymentModes', 'lots', 'allCodeMap');
             });
 
             $resetFilters = function () {
-                $this->reset(['scheme_id', 'lot_financial_year', 'lot_month']);
+                $this->reset(['scheme_id', 'lot_financial_year', 'lot_month', 'payment_type', 'lot_type', 'target_payment_mode', 'has_searched']);
+            };
+
+            $search = function () {
+                $this->has_searched = true;
+            };
+
+            $downloadExcel = function ($lotNo, $type) {
+                session()->flash('status', "Beneficiary list download for Lot $lotNo ($type) initiated.");
             };
 
             $executeStep = function ($lotNo, $actionKey) {
@@ -101,7 +129,7 @@ middleware(['auth', 'verified']);
                     <!-- Scheme -->
                     <div>
                         <label class="block text-sm font-semibold text-gray-800 mb-2">Scheme</label>
-                        <select wire:model.live="scheme_id" class="block w-full border-gray-200 rounded-md shadow-sm focus:ring-orange-500 focus:border-orange-500 text-sm py-2 text-gray-600">
+                        <select wire:model="scheme_id" class="block w-full border-gray-200 rounded-md shadow-sm focus:ring-orange-500 focus:border-orange-500 text-sm py-2 text-gray-600">
                             <option value="">-- All Schemes --</option>
                             @foreach($schemes as $sch)
                                 <option value="{{ $sch->id }}">{{ $sch->display_name ?? $sch->name }}</option>
@@ -112,7 +140,7 @@ middleware(['auth', 'verified']);
                     <!-- Year -->
                     <div>
                         <label class="block text-sm font-semibold text-gray-800 mb-2">Financial Year</label>
-                        <select wire:model.live="lot_financial_year" class="block w-full border-gray-200 rounded-md shadow-sm text-gray-600 focus:ring-orange-500 focus:border-orange-500 text-sm py-2">
+                        <select wire:model="lot_financial_year" class="block w-full border-gray-200 rounded-md shadow-sm text-gray-600 focus:ring-orange-500 focus:border-orange-500 text-sm py-2">
                             <option value="">-- All Years --</option>
                             @foreach($financialYears as $value => $label)
                                 <option value="{{ $value }}">{{ $label }}</option>
@@ -123,18 +151,54 @@ middleware(['auth', 'verified']);
                     <!-- Month -->
                     <div>
                         <label class="block text-sm font-semibold text-gray-800 mb-2">Month</label>
-                        <select wire:model.live="lot_month" class="block w-full border-gray-200 rounded-md shadow-sm focus:ring-orange-500 focus:border-orange-500 text-sm py-2 text-gray-600">
+                        <select wire:model="lot_month" class="block w-full border-gray-200 rounded-md shadow-sm focus:ring-orange-500 focus:border-orange-500 text-sm py-2 text-gray-600">
                             <option value="">-- All Months --</option>
                             @foreach($months as $value => $label)
                                 <option value="{{ $value }}">{{ $label }}</option>
                             @endforeach
                         </select>
                     </div>
+
+                    <!-- Payment Type -->
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-800 mb-2">Select Payment Type *</label>
+                        <select wire:model="payment_type" class="block w-full border-gray-200 rounded-md shadow-sm focus:ring-orange-500 focus:border-orange-500 text-sm py-2 text-gray-600">
+                            <option value="">-- Select Payment Type --</option>
+                            @foreach($paymentTypes as $value => $label)
+                                <option value="{{ $value }}">{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <!-- Lot Type -->
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-800 mb-2">Lot Type *</label>
+                        <select wire:model="lot_type" class="block w-full border-gray-200 rounded-md shadow-sm focus:ring-orange-500 focus:border-orange-500 text-sm py-2 text-gray-600">
+                            <option value="">-- Select Lot Type --</option>
+                            @foreach($lotTypes as $value => $label)
+                                <option value="{{ $value }}">{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <!-- Target Payment Mode -->
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-800 mb-2">Target Payment Mode *</label>
+                        <select wire:model="target_payment_mode" class="block w-full border-gray-200 rounded-md shadow-sm focus:ring-orange-500 focus:border-orange-500 text-sm py-2 text-gray-600">
+                            <option value="">-- Select Mode --</option>
+                            @foreach($paymentModes as $value => $label)
+                                <option value="{{ $value }}">{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
                 </div>
                 
-                <div class="flex justify-end mt-4">
+                <div class="flex justify-end mt-4 space-x-3">
                     <button wire:click="resetFilters" class="px-6 py-2 bg-gray-500 text-white rounded shadow-sm hover:bg-gray-600 font-semibold text-sm transition-colors">
                         Reset Filters
+                    </button>
+                    <button wire:click="search" class="px-6 py-2 bg-orange-500 text-white rounded shadow-sm hover:bg-orange-600 font-semibold text-sm transition-colors">
+                        Search
                     </button>
                 </div>
             </div>
@@ -165,18 +229,25 @@ middleware(['auth', 'verified']);
                                         {{ $lot->lot_no }}
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                                        {{ strtoupper($lot->payment_mode) }} <br>
-                                        <span class="text-xs text-gray-400">Type: {{ $lot->integration_type ?? 'API' }}</span>
+                                        {{ strtoupper($allCodeMap[$lot->payment_mode] ?? $lot->payment_mode) }} <br>
+                                        <span class="text-xs text-gray-400">Type: {{ strtoupper($lot->int_type ?? 'API') }}</span>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                                        {{ number_format($lot->ben_count) }}
+                                        <div class="flex items-center space-x-2">
+                                            <span>{{ number_format($lot->ben_count) }}</span>
+                                            @if(($lot->ben_count ?? 0) > 0)
+                                                <button wire:click="downloadExcel('{{ $lot->lot_no }}', 'total')" class="text-blue-500 hover:text-blue-700 bg-blue-50 p-1 rounded transition-colors" title="Download Beneficiaries CSV">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                                                </button>
+                                            @endif
+                                        </div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-700">
                                         {{ number_format($lot->total_amount, 2) }}
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap">
                                         <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                                            {{ $lot->cur_status ?? 'generated' }}
+                                            {{ $allCodeMap[$lot->cur_status] ?? $lot->cur_status ?? 'Generated' }}
                                         </span>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap">
@@ -190,7 +261,11 @@ middleware(['auth', 'verified']);
                                         <svg class="mx-auto h-12 w-12 text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                                         </svg>
-                                        No Payment Lots found matching the selected filters.
+                                        @if($has_searched)
+                                            No Payment Lots found matching the selected filters.
+                                        @else
+                                            Please apply filters and click Search to load data.
+                                        @endif
                                     </td>
                                 </tr>
                             @endforelse

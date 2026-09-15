@@ -23,8 +23,11 @@ class PaymentGatewayFactory
         // Assuming $lot has properties or relationships to determine this.
         // For demonstration, we'll use dummy logic that should be replaced with actual DB checks.
         
-        $paymentModeName = strtolower($lot->payment_mode ?? 'sbi');
-        $integrationType = strtolower($lot->integration_type ?? 'api');
+        $paymentModeCode = $lot->payment_mode;
+        // fetch the name from Codemaster
+        $paymentModeModel = \App\Models\Codemaster::where('code', $paymentModeCode)->first();
+        $paymentModeName = strtolower($paymentModeModel ? $paymentModeModel->short_name ?? $paymentModeModel->name : ($lot->payment_mode ?? 'sbi'));
+        $integrationType = strtolower($lot->int_type ?? 'api');
 
         if (str_contains($paymentModeName, 'ifms')) {
             return $integrationType === 'sftp' ? app()->make(IfmsSftpGateway::class) : app()->make(IfmsApiGateway::class);
