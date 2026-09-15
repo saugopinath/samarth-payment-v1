@@ -32,6 +32,21 @@ middleware(['auth', 'verified']);
                 'lot_type' => '',
                 'target_payment_mode' => '',
                 'has_searched' => false,
+                'show_bill_modal' => false,
+                'current_bill_lot_no' => null,
+                'bill_data' => [
+                    'treasury_code' => '',
+                    'ddo_code' => '',
+                    'head_of_account' => '',
+                    'gross_amount' => '',
+                    'net_amount' => '',
+                    'sanction_amount' => '',
+                    'sanction_number' => '',
+                    'sanction_date' => '',
+                    'issuing_authority' => '',
+                    'bill_number' => '',
+                    'bill_date' => '',
+                ],
             ]);
 
             with(function () {
@@ -84,6 +99,26 @@ middleware(['auth', 'verified']);
             };
 
             $executeStep = function ($lotNo, $actionKey) {
+                if ($actionKey === 'bill_generation') {
+                    $lotMaster = PaymentLotMaster::where('lot_no', $lotNo)->firstOrFail();
+                    $this->current_bill_lot_no = $lotNo;
+                    $this->bill_data = [
+                        'treasury_code' => 'TEST-TR',
+                        'ddo_code' => 'TEST-DDO',
+                        'head_of_account' => 'TEST-HOA',
+                        'gross_amount' => $lotMaster->total_amount,
+                        'net_amount' => $lotMaster->total_amount,
+                        'sanction_amount' => $lotMaster->total_amount,
+                        'sanction_number' => '',
+                        'sanction_date' => '',
+                        'issuing_authority' => '',
+                        'bill_number' => '',
+                        'bill_date' => '',
+                    ];
+                    $this->show_bill_modal = true;
+                    return;
+                }
+
                 try {
                     $lotMaster = PaymentLotMaster::where('lot_no', $lotNo)->firstOrFail();
                     $service = \App\Services\Payment\PaymentGatewayFactory::make($lotMaster);
@@ -101,6 +136,42 @@ middleware(['auth', 'verified']);
                     }
                 } catch (\Exception $e) {
                     session()->flash('error', 'Error executing action for lot ' . $lotNo . ': ' . $e->getMessage());
+                }
+            };
+
+            $closeBillModal = function () {
+                $this->show_bill_modal = false;
+                $this->current_bill_lot_no = null;
+            };
+
+            $submitBillGeneration = function () {
+                $this->validate([
+                    'bill_data.sanction_number' => 'required',
+                    'bill_data.sanction_date' => 'required',
+                    'bill_data.issuing_authority' => 'required',
+                    'bill_data.bill_number' => 'required',
+                    'bill_data.bill_date' => 'required',
+                ]);
+
+                try {
+                    $lotMaster = PaymentLotMaster::where('lot_no', $this->current_bill_lot_no)->firstOrFail();
+                    $service = \App\Services\Payment\PaymentGatewayFactory::make($lotMaster);
+                    
+                    $result = $service->executeStep($lotMaster, 'bill_generation', $this->bill_data);
+
+                    if (isset($result['status'])) {
+                        if ($result['status'] == 1) {
+                            session()->flash('status', $result['msg'] ?? 'Bill generated successfully.');
+                        } else {
+                            session()->flash('error', $result['msg'] ?? 'Bill generation failed.');
+                        }
+                    } else {
+                        session()->flash('status', 'Bill generated.');
+                    }
+                    
+                    $this->closeBillModal();
+                } catch (\Exception $e) {
+                    session()->flash('error', 'Error executing action: ' . $e->getMessage());
                 }
             };
         ?>
@@ -274,6 +345,94 @@ middleware(['auth', 'verified']);
                 </div>
             </div>
             
+            <!-- Bill Generation Modal -->
+            @if($show_bill_modal)
+                <div class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto overflow-x-hidden bg-gray-900 bg-opacity-50">
+                    <div class="relative w-full max-w-4xl p-4">
+                        <div class="relative bg-white rounded-lg shadow">
+                            <div class="flex items-start justify-between p-4 border-b rounded-t bg-blue-600">
+                                <h3 class="text-xl font-semibold text-white">
+                                    Bill Generation
+                                </h3>
+                                <button wire:click="closeBillModal" type="button" class="text-white bg-transparent hover:bg-blue-700 rounded-lg text-sm p-1.5 ml-auto inline-flex items-center">
+                                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
+                                </button>
+                            </div>
+                            
+                            <div class="p-6 space-y-6">
+                                <h4 class="text-sm font-bold text-blue-600 border-b pb-2">Bill Details (Lot No: {{ $current_bill_lot_no }})</h4>
+                                
+                                <div class="grid grid-cols-3 gap-6 text-center text-sm">
+                                    <div>
+                                        <div class="font-semibold text-gray-600">Treasury Code</div>
+                                        <div class="mt-1 font-bold">{{ $bill_data['treasury_code'] }}</div>
+                                    </div>
+                                    <div>
+                                        <div class="font-semibold text-gray-600">DDO Code</div>
+                                        <div class="mt-1 font-bold">{{ $bill_data['ddo_code'] }}</div>
+                                    </div>
+                                    <div>
+                                        <div class="font-semibold text-gray-600">Head of Account</div>
+                                        <div class="mt-1 font-bold">{{ $bill_data['head_of_account'] }}</div>
+                                    </div>
+                                    
+                                    <div class="border-t pt-4">
+                                        <div class="font-semibold text-gray-600">Gross Amount (₹)</div>
+                                        <div class="mt-1 font-bold">{{ number_format($bill_data['gross_amount'], 2) }}</div>
+                                    </div>
+                                    <div class="border-t pt-4">
+                                        <div class="font-semibold text-gray-600">Net Amount (₹)</div>
+                                        <div class="mt-1 font-bold">{{ number_format($bill_data['net_amount'], 2) }}</div>
+                                    </div>
+                                    <div class="border-t pt-4">
+                                        <div class="font-semibold text-gray-600">Sanction Amount (₹)</div>
+                                        <div class="mt-1 font-bold">{{ number_format($bill_data['sanction_amount'], 2) }}</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="grid grid-cols-3 gap-6 border-t pt-6">
+                                    <div>
+                                        <label class="block text-xs font-semibold text-gray-700 mb-1">Sanction Number *</label>
+                                        <input type="text" wire:model="bill_data.sanction_number" class="w-full border-gray-300 rounded shadow-sm text-sm focus:ring-blue-500 focus:border-blue-500">
+                                        @error('bill_data.sanction_number') <span class="text-red-500 text-xs mt-1 block">{{ $message }}</span> @enderror
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-semibold text-gray-700 mb-1">Sanction Date *</label>
+                                        <input type="date" wire:model="bill_data.sanction_date" class="w-full border-gray-300 rounded shadow-sm text-sm focus:ring-blue-500 focus:border-blue-500">
+                                        @error('bill_data.sanction_date') <span class="text-red-500 text-xs mt-1 block">{{ $message }}</span> @enderror
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-semibold text-gray-700 mb-1">Issuing Authority *</label>
+                                        <input type="text" wire:model="bill_data.issuing_authority" class="w-full border-gray-300 rounded shadow-sm text-sm focus:ring-blue-500 focus:border-blue-500">
+                                        @error('bill_data.issuing_authority') <span class="text-red-500 text-xs mt-1 block">{{ $message }}</span> @enderror
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-semibold text-gray-700 mb-1">Bill Number *</label>
+                                        <input type="text" wire:model="bill_data.bill_number" class="w-full border-gray-300 rounded shadow-sm text-sm focus:ring-blue-500 focus:border-blue-500">
+                                        @error('bill_data.bill_number') <span class="text-red-500 text-xs mt-1 block">{{ $message }}</span> @enderror
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-semibold text-gray-700 mb-1">Bill Date *</label>
+                                        <input type="date" wire:model="bill_data.bill_date" class="w-full border-gray-300 rounded shadow-sm text-sm focus:ring-blue-500 focus:border-blue-500">
+                                        @error('bill_data.bill_date') <span class="text-red-500 text-xs mt-1 block">{{ $message }}</span> @enderror
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="flex items-center justify-center p-6 border-t border-gray-200 rounded-b space-x-4 bg-gray-50">
+                                <button wire:click="submitBillGeneration" type="button" class="text-blue-700 bg-blue-100 border border-blue-200 hover:bg-blue-200 font-bold rounded text-sm px-5 py-2.5 text-center flex items-center shadow-sm">
+                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                                    Bill Share
+                                </button>
+                                <button wire:click="closeBillModal" type="button" class="text-gray-700 bg-white border border-gray-300 hover:bg-gray-100 font-semibold rounded text-sm px-5 py-2.5 text-center flex items-center shadow-sm">
+                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                                    Reset / Close
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            @endif
         </div>
     </div>
     @endvolt

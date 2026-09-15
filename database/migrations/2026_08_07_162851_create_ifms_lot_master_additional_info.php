@@ -39,6 +39,12 @@ return new class extends Migration
                 tran_date character(8),
                 agency_dr_ref character(6),
                 debit_narration character varying(50),
+                sanctionAmount numeric(15,2) null,
+                issueingAuth character varying(255) null,
+                sanctionNumber character varying(255) null,
+                sanctionDate character varying(255) null,
+                billNo character varying(255) null,
+                billDate character varying(255) null,
                 CONSTRAINT ifms_lot_master_additional_info_pkey PRIMARY KEY (lot_no, lot_year, scheme_id)
             ) PARTITION BY LIST (lot_year);
         ");

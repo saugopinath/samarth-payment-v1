@@ -2,14 +2,19 @@
 
 namespace App\Services\Payment\Commands\IfmsApi;
 
-use App\Services\Payment\Commands\CommandInterface;
+use App\Services\Payment\Contracts\PaymentStepCommand;
 use App\Models\PaymentLotMaster;
 
-class ImportResponseCommand implements CommandInterface
+class ImportResponseCommand implements PaymentStepCommand
 {
-    public function execute(PaymentLotMaster $lot, array $data = []): bool
+    public function execute($lot, array $data = []): array
     {
         $lot->update(['cur_status' => 'PLSIFMS_RESP_IMP']);
-        return true;
+        
+        return [
+            'status' => 1,
+            'msg' => 'Response imported successfully.',
+            'type' => 'green'
+        ];
     }
 }

@@ -46,4 +46,9 @@ return [
         'driver' => env('CAPTCHA_DRIVER', 'mews'),
     ],
 
+    'ifms' => [
+        'base_url' => env('IFMS_BASE_URL', 'http://localhost:8080/ifmsapi/'),
+        'public_key_path' => env('IFMS_PUBLIC_KEY_PATH', 'app/IFMS/publicKey.pem'),
+    ],
+
 ];
