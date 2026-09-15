@@ -14,5 +14,10 @@ return [
         'ack' => env('IFMS_LOCAL_PATH_ACK', 'ifms_xml/ack'),
         'rbi_resp' => env('IFMS_LOCAL_PATH_RBI_RESP', 'ifms_xml/rbi_resp'),
         'ifms_resp' => env('IFMS_LOCAL_PATH_IFMS_RESP', 'ifms_xml/ifms_resp')
-        ],
+    ],
+    'api' => [
+        'base_url' => env('IFMS_API_BASE_URL', ''),
+        'public_key_path' => env('IFMS_PUBLIC_KEY_PATH', 'app/IFMS/publicKey.pem'),
+        'jb_private_key_path' => env('IFMS_JB_PRIVATE_KEY_PATH', 'app/IFMS/Jb_key/PrivateKey.pem'),
+    ],
 ];

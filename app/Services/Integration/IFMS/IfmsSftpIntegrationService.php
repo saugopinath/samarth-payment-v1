@@ -10,7 +10,7 @@ use App\Models\PaymentMainSetting;
 use App\Models\Scheme;
 use App\Models\Codemaster;
 use App\Models\FailedPaymentDetail;
-use App\Services\Contracts\PaymentIFMSSFTPIntegrationInterface;
+use App\Services\Integration\AbstractPaymentIntegrationService;
 use Carbon\Carbon;
 use DOMDocument;
 use Illuminate\Support\Facades\DB;
@@ -18,17 +18,9 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use Exception;
 
-class IfmsSftpIntegrationService implements PaymentIFMSSFTPIntegrationInterface
+class IfmsSftpIntegrationService extends AbstractPaymentIntegrationService
 {
-    private static $instance = null;
 
-    public static function getInstance(): self
-    {
-        if (self::$instance == null) {
-            self::$instance = new self();
-        }
-        return self::$instance;
-    }
 
     public function preparePayload(PaymentLotMaster $lotMaster): bool
     {
@@ -48,20 +40,13 @@ class IfmsSftpIntegrationService implements PaymentIFMSSFTPIntegrationInterface
             $financialYear = $lotMaster->lot_year;
             $lotMonth = $lotMaster->lot_month;
 
-            $setting = PaymentMainSetting::where('scheme_id', $schemeId)
-                ->where('financial_year', $financialYear)
-                ->first();
-
-            $ddocode = '';
-            $partyCode = '';
-            if ($setting) {
-                $monthField = strtolower($lotMonth);
-                $monthData = $setting->$monthField;
-                if (is_array($monthData)) {
-                    $ddocode = $monthData['ddo_code'] ?? '';
-                    $partyCode = $monthData['party_code'] ?? '';
-                }
+            $ifmsSetting = \App\Models\IfmsPaymentSetting::where('scheme_id', $schemeId)->first();
+            if (!$ifmsSetting) {
+                $ifmsSetting = \App\Models\IfmsPaymentSetting::whereNull('scheme_id')->first();
             }
+
+            $ddocode = $ifmsSetting ? $ifmsSetting->ddo_code : '';
+            $partyCode = $ifmsSetting ? $ifmsSetting->party_code : '';
 
             $schemeDetail = Scheme::find($schemeId);
             $schemeName = $schemeDetail ? ($schemeDetail->display_name ?? $schemeDetail->name) : '';
@@ -156,20 +141,13 @@ class IfmsSftpIntegrationService implements PaymentIFMSSFTPIntegrationInterface
             $financialYear = $lotMaster->lot_year;
             $lotMonth = $lotMaster->lot_month;
 
-            $setting = PaymentMainSetting::where('scheme_id', $schemeId)
-                ->where('financial_year', $financialYear)
-                ->first();
-
-            $ddocode = '';
-            $partyCode = '';
-            if ($setting) {
-                $monthField = strtolower($lotMonth);
-                $monthData = $setting->$monthField;
-                if (is_array($monthData)) {
-                    $ddocode = $monthData['ddo_code'] ?? '';
-                    $partyCode = $monthData['party_code'] ?? '';
-                }
+            $ifmsSetting = \App\Models\IfmsPaymentSetting::where('scheme_id', $schemeId)->first();
+            if (!$ifmsSetting) {
+                $ifmsSetting = \App\Models\IfmsPaymentSetting::whereNull('scheme_id')->first();
             }
+
+            $ddocode = $ifmsSetting ? $ifmsSetting->ddo_code : '';
+            $partyCode = $ifmsSetting ? $ifmsSetting->party_code : '';
             $lotNo = $lotMaster->lot_no;  
             $fileName = $lotMaster->file_name;      	
             //dump(config('ifms.paths.dotdone'));dump($partyCode);dd( $fileName);	     
@@ -248,20 +226,13 @@ class IfmsSftpIntegrationService implements PaymentIFMSSFTPIntegrationInterface
             $financialYear = $lotMaster->lot_year;
             $lotMonth = $lotMaster->lot_month;
 
-            $setting = PaymentMainSetting::where('scheme_id', $schemeId)
-                ->where('financial_year', $financialYear)
-                ->first();
-
-            $ddocode = '';
-            $partyCode = '';
-            if ($setting) {
-                $monthField = strtolower($lotMonth);
-                $monthData = $setting->$monthField;
-                if (is_array($monthData)) {
-                    $ddocode = $monthData['ddo_code'] ?? '';
-                    $partyCode = $monthData['party_code'] ?? '';
-                }
+            $ifmsSetting = \App\Models\IfmsPaymentSetting::where('scheme_id', $schemeId)->first();
+            if (!$ifmsSetting) {
+                $ifmsSetting = \App\Models\IfmsPaymentSetting::whereNull('scheme_id')->first();
             }
+
+            $ddocode = $ifmsSetting ? $ifmsSetting->ddo_code : '';
+            $partyCode = $ifmsSetting ? $ifmsSetting->party_code : '';
             $lotNo = $lotMaster->lot_no;  
             $fileName = $lotMaster->file_name;
           
@@ -473,20 +444,13 @@ class IfmsSftpIntegrationService implements PaymentIFMSSFTPIntegrationInterface
             $financialYear = $lotMaster->lot_year;
             $lotMonth = $lotMaster->lot_month;
 
-            $setting = PaymentMainSetting::where('scheme_id', $schemeId)
-                ->where('financial_year', $financialYear)
-                ->first();
-
-            $ddocode = '';
-            $partyCode = '';
-            if ($setting) {
-                $monthField = strtolower($lotMonth);
-                $monthData = $setting->$monthField;
-                if (is_array($monthData)) {
-                    $ddocode = $monthData['ddo_code'] ?? '';
-                    $partyCode = $monthData['party_code'] ?? '';
-                }
+            $ifmsSetting = \App\Models\IfmsPaymentSetting::where('scheme_id', $schemeId)->first();
+            if (!$ifmsSetting) {
+                $ifmsSetting = \App\Models\IfmsPaymentSetting::whereNull('scheme_id')->first();
             }
+
+            $ddocode = $ifmsSetting ? $ifmsSetting->ddo_code : '';
+            $partyCode = $ifmsSetting ? $ifmsSetting->party_code : '';
             $lotNo = $lotMaster->lot_no;  
             $baseFileName = preg_replace('/\.xml$/i', '', $lotMaster->file_name);      
             

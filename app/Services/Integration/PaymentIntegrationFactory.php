@@ -16,9 +16,32 @@ use App\Services\Integration\IFMS_V3\IfmsV3ApiIntegrationService;
 class PaymentIntegrationFactory
 {
     /**
+     * Strategy map associating payment mode keywords with their respective service classes.
+     * Structured as: 'keyword' => ['sftp' => SftpClass, 'api' => ApiClass]
+     */
+    protected static array $strategies = [
+        'bandhan' => [
+            'sftp' => BandhanSftpIntegrationService::class,
+            'api'  => BandhanApiIntegrationService::class,
+        ],
+        'ifms v3' => [
+            'sftp' => IfmsV3SftpIntegrationService::class,
+            'api'  => IfmsV3ApiIntegrationService::class,
+        ],
+        'ifms' => [
+            'sftp' => IfmsSftpIntegrationService::class,
+            'api'  => IfmsApiIntegrationService::class,
+        ],
+        'sbi' => [
+            'sftp' => SbiSftpIntegrationService::class,
+            'api'  => SbiApiIntegrationService::class,
+        ],
+    ];
+
+    /**
      * Factory method to return the correct integration strategy (SFTP or API).
      */
-    public static function make($lotNo): \App\Services\Contracts\PaymentSBIIntegrationInterface
+    public static function make($lotNo): \App\Services\Contracts\PaymentIntegrationInterface
     {
         $lotMaster = PaymentLotMaster::where('lot_no', $lotNo)->firstOrFail();
         
@@ -36,18 +59,21 @@ class PaymentIntegrationFactory
             }
         }
 
-        // Get the payment mode string (e.g. 'SBI', 'Bandhan', 'IFMS V3')
         $paymentModeName = strtolower(Codemaster::where('code', $lotMaster->payment_mode)->first()?->name ?? 'sbi');
-
-        if (str_contains($paymentModeName, 'bandhan')) {
-            return $integrationType === 'api' ? BandhanApiIntegrationService::getInstance() : BandhanSftpIntegrationService::getInstance();
-        } elseif (str_contains($paymentModeName, 'ifms v3')) {
-            return $integrationType === 'api' ? IfmsV3ApiIntegrationService::getInstance() : IfmsV3SftpIntegrationService::getInstance();
-        } elseif (str_contains($paymentModeName, 'ifms')) {
-            return $integrationType === 'api' ? IfmsApiIntegrationService::getInstance() : IfmsSftpIntegrationService::getInstance();
+        
+        // Find matching strategy
+        $selectedStrategy = self::$strategies['sbi']; // Default
+        foreach (self::$strategies as $keyword => $strategy) {
+            if (str_contains($paymentModeName, $keyword)) {
+                $selectedStrategy = $strategy;
+                break;
+            }
         }
 
-        // Default to SBI
-        return $integrationType === 'api' ? SbiApiIntegrationService::getInstance() : SbiSftpIntegrationService::getInstance();
+        // Determine the class based on integration type (default to SFTP if API is not found)
+        $serviceClass = $selectedStrategy[$integrationType] ?? $selectedStrategy['sftp'];
+
+        // Use Laravel's container to resolve the dependency
+        return app()->make($serviceClass);
     }
 }

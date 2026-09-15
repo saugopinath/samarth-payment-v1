@@ -4,56 +4,47 @@ namespace App\Services\Integration\SBI;
 
 use App\Models\PaymentLotMaster;
 use App\Models\SbiPaymentLotMasterAdditionalInfo;
-use App\Services\Contracts\PaymentSBIIntegrationInterface;
+use App\Services\Integration\AbstractPaymentIntegrationService;
 
-class SbiApiIntegrationService implements PaymentSBIIntegrationInterface
+class SbiApiIntegrationService extends AbstractPaymentIntegrationService
 {
-    private static $instance = null;
 
-    public static function getInstance()
+    protected function getStatusKey(PaymentLotMaster $lotMaster): string
     {
-        if (self::$instance == null) {
-            self::$instance = new SbiApiIntegrationService();
-        }
-        return self::$instance;
+        return (string)$lotMaster->cur_status;
     }
 
-    public function preparePayload(PaymentLotMaster $lotMaster)
+    protected function getActionMap(): array
     {
-        // TODO: Implement API payload generation (e.g. JSON building)
-        
-        // Return structured data or true if everything is set
-        return true;
-    }
-
-    public function pushToTarget(PaymentLotMaster $lotMaster)
-    {
-        // TODO: Implement actual API HTTP POST logic for pushing to SBI
         return [
-            'status' => 1,
-            'msg' => 'API Base logic for push not yet implemented for Lot - ' . $lotMaster->lot_no,
-            'type' => 'blue'
+            (string)config('payment_lot.status.common.generated') => [
+                ['key' => 'sign', 'label' => 'Sign Lot', 'color' => 'green'],
+                ['key' => 'defunc', 'label' => 'Defunc Lot', 'color' => 'green']
+            ],
+            (string)config('payment_lot.status.sbi.signed') => [
+                ['key' => 'push', 'label' => 'Push to API', 'color' => 'blue'],
+                ['key' => 'defunc', 'label' => 'Defunc Lot', 'color' => 'green']
+            ],
+            (string)config('payment_lot.status.common.push') => [
+                ['key' => 'check_ack', 'label' => 'Check API Acknowledge', 'color' => 'blue']
+            ],
+            (string)config('payment_lot.status.common.ack') => [
+                ['key' => 'check_res', 'label' => 'Check API Response', 'color' => 'purple']
+            ],
         ];
     }
 
-    public function checkAcknowledge(PaymentLotMaster $lotMaster)
+    protected function resolveCommandClass(string $actionKey): ?string
     {
-        // TODO: Implement actual API HTTP GET logic for check acknowledge
-        return [
-            'status' => 1,
-            'msg' => 'API Base logic for check acknowledge not yet implemented for Lot - ' . $lotMaster->lot_no,
-            'type' => 'blue'
+        $map = [
+            'sign' => \App\Services\Integration\Commands\Sbi\SignLotCommand::class,
+            'push' => \App\Services\Integration\Commands\Sbi\PushCommand::class,
+            'check_ack' => \App\Services\Integration\Commands\Sbi\CheckAcknowledgeCommand::class,
+            'check_res' => \App\Services\Integration\Commands\Sbi\CheckResponseCommand::class,
+            'defunc' => \App\Services\Integration\Commands\Common\DefuncLotCommand::class,
         ];
-    }
 
-    public function checkResponse(PaymentLotMaster $lotMaster)
-    {
-        // TODO: Implement actual API HTTP GET logic for check response
-        return [
-            'status' => 1,
-            'msg' => 'API Base logic for check response not yet implemented for Lot - ' . $lotMaster->lot_no,
-            'type' => 'blue'
-        ];
+        return $map[$actionKey] ?? null;
     }
 }
 

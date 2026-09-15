@@ -9,19 +9,17 @@ use Exception;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\File;
 use App\Models\SbiPaymentLotMasterAdditionalInfo;
-use App\Services\Contracts\PaymentSBISFTPIntegrationInterface;
+use App\Services\Integration\AbstractPaymentIntegrationService;
 use App\Helpers\XmlSigner;
 use App\Helpers\SBIEncryptDecrypt;
 
-class SbiSftpIntegrationService implements PaymentSBISFTPIntegrationInterface
+class SbiSftpIntegrationService extends AbstractPaymentIntegrationService
 {
-    private static $instance = null;
-    
     public $sbi_sftp_server;
     public $dec_privateKey;
     public $enc_publickey;
 
-    private function __construct()
+    public function __construct()
     {
         // Read SFTP server from application settings (config/sbi.php)
         $this->sbi_sftp_server ='sftp_sbi';
@@ -29,14 +27,7 @@ class SbiSftpIntegrationService implements PaymentSBISFTPIntegrationInterface
         // RSA KEY FOR ENCRYPTION
         $this->dec_privateKey = file_exists(storage_path('app/cert_enc/jb-private-key.pem')) ? file_get_contents(storage_path('app/cert_enc/jb-private-key.pem')) : null;
         $this->enc_publickey = file_exists(storage_path('app/cert_enc/sbi-public-key.pem')) ? file_get_contents(storage_path('app/cert_enc/sbi-public-key.pem')) : null;
-    }
 
-    public static function getInstance()
-    {
-        if (self::$instance == null) {
-            self::$instance = new SbiSftpIntegrationService();
-        }
-        return self::$instance;
     }
 
     public function preparePayload(PaymentLotMaster $lotMaster)

@@ -4,60 +4,59 @@ namespace App\Services\Integration\IFMS;
 
 use App\Models\PaymentLotMaster;
 use App\Models\SbiPaymentLotMasterAdditionalInfo;
-use App\Services\Contracts\PaymentSBIIntegrationInterface;
+use App\Services\Integration\AbstractPaymentIntegrationService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
-use App\Scheme;
+
 use Carbon\Carbon;
 use App\Helpers\IFMSEncryptDecrypt;
 use GuzzleHttp\Client;
 
-class IfmsApiIntegrationService implements PaymentSBIIntegrationInterface
+class IfmsApiIntegrationService extends AbstractPaymentIntegrationService
 {
-    private static $instance = null;
 
-    public static function getInstance()
+    protected function getStatusKey(PaymentLotMaster $lotMaster): string
     {
-        if (self::$instance == null) {
-            self::$instance = new IfmsApiIntegrationService();
+        if ($lotMaster->cur_status == config('payment_lot.status.common.generated')) {
+            return 'generated';
         }
-        return self::$instance;
+        return "{$lotMaster->lot_status}_{$lotMaster->bill_status}_{$lotMaster->push_to_ifms_status}";
     }
 
-    public function preparePayload(PaymentLotMaster $lotMaster)
+    protected function getActionMap(): array
     {
-        // TODO: Implement IFMS API payload generation
-        return true;
-    }
-
-    public function pushToTarget(PaymentLotMaster $lotMaster)
-    {
-        // TODO: Implement IFMS API push
         return [
-            'status' => 1,
-            'msg' => 'IFMS API push not yet implemented for Lot - ' . $lotMaster->lot_no,
-            'type' => 'blue'
+            'generated' => [
+                ['key' => 'bill_generation', 'label' => 'Bill Generation', 'color' => 'blue', 'modal' => 'bill'],
+                ['key' => 'defunc', 'label' => 'Defunc Lot', 'color' => 'green']
+            ],
+            '1_1_0' => [
+                ['key' => 'beneficiary_push', 'label' => 'Beneficiary send To IFMS', 'color' => 'yellow']
+            ],
+            '0_2_1' => [
+                ['key' => 'check_bill_status', 'label' => 'Bill Status Received', 'color' => 'green']
+            ],
+            '0_3_1' => [
+                ['key' => 'receive_response', 'label' => 'Receive Response', 'color' => 'blue']
+            ],
+            '0_4_1' => [
+                ['key' => 'import_response', 'label' => 'Import Response', 'color' => 'yellow']
+            ]
         ];
     }
 
-    public function checkAcknowledge(PaymentLotMaster $lotMaster)
+    protected function resolveCommandClass(string $actionKey): ?string
     {
-        // TODO: Implement IFMS API acknowledge
-        return [
-            'status' => 1,
-            'msg' => 'IFMS API acknowledge not yet implemented for Lot - ' . $lotMaster->lot_no,
-            'type' => 'blue'
+        $map = [
+            'bill_generation' => \App\Services\Integration\Commands\Ifms\BillGenerationCommand::class,
+            'beneficiary_push' => \App\Services\Integration\Commands\Ifms\BeneficiaryPushCommand::class,
+            'check_bill_status' => \App\Services\Integration\Commands\Ifms\CheckBillStatusCommand::class,
+            'receive_response' => \App\Services\Integration\Commands\Ifms\ReceiveResponseCommand::class,
+            'import_response' => \App\Services\Integration\Commands\Ifms\ImportResponseCommand::class,
+            'defunc' => \App\Services\Integration\Commands\Common\DefuncLotCommand::class,
         ];
-    }
 
-    public function checkResponse(PaymentLotMaster $lotMaster)
-    {
-        // TODO: Implement IFMS API response
-        return [
-            'status' => 1,
-            'msg' => 'IFMS API response not yet implemented for Lot - ' . $lotMaster->lot_no,
-            'type' => 'blue'
-        ];
+        return $map[$actionKey] ?? null;
     }
 
     public function authiticated($client_id, $client_secret)
@@ -69,35 +68,35 @@ class IfmsApiIntegrationService implements PaymentSBIIntegrationInterface
             // $clientSecret = '9005694D7E0818B4A788465A050A7778F9CF06008B9C44205A59C1ACDEEBB1FE0F74E0CCEA5F9BC46B1A7C3955F02E7EA9D7BAA8206453D07BC30D8429710D1F';
             $clientSecret = $client_secret;
             // $clientSecret = 'E94AFEC0357C49363567D7C3E6B86F6A0C86F8B02EE760ACB7F83E00D612F67C8F7ED417942723B97C5A7C1D84EC2CB2AC55F811F94FA9C1DEB7BEF09501C8A2';
-            // $postUrl = 'https://uat.wbifms.gov.in/food/main/version/authenticate';
-            $postUrl = 'https://www.wbifms.gov.in/food/main/version/authenticate';
-            $publicKeyPath = storage_path('app/IFMS/publicKey.pem');
-            $JBprivateKeyPath = storage_path('app/IFMS/Jb_key/PrivateKey.pem');
+            $postUrl = config('ifms.api.auth_url');
+            $publicKeyPath = storage_path(config('ifms.api.public_key_path', 'app/IFMS/publicKey.pem'));
+            $JBprivateKeyPath = storage_path(config('ifms.api.jb_private_key_path', 'app/IFMS/Jb_key/PrivateKey.pem'));
             // dd($JBprivateKeyPath);
             $symmetricKey = IFMSEncryptDecrypt::generateAES256Key();
             $encryptedAppKey = IFMSEncryptDecrypt::encryptSymmetricKey($symmetricKey, $publicKeyPath);
             //  var_dump($encryptedAppKey);die;
             // dd(base64_encode($encryptedAppKey));
             $headers = [
-                'Content-Type: application/json',
-                'clientId: ' . $clientId,
-                'clientSecret: ' . $clientSecret,
+                'Content-Type' => 'application/json',
+                'clientId' => $clientId,
+                'clientSecret' => $clientSecret,
             ];
             $payload = [
                 'appKey' => base64_encode($encryptedAppKey),
             ];
-            $curl = curl_init($postUrl);
-            curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
+            
+            $client = new Client();
+            try {
+                $guzzleResponse = $client->post($postUrl, [
+                    'headers' => $headers,
+                    'body' => json_encode($payload),
+                    'http_errors' => false,
+                ]);
+                $response = $guzzleResponse->getBody()->getContents();
+            } catch (\GuzzleHttp\Exception\GuzzleException $e) {
+                throw new \Exception('Guzzle Error: ' . $e->getMessage());
+            }
 
-
-            // curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, 0);
-            // curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, 0);
-
-            curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($curl, CURLOPT_POSTFIELDS, json_encode($payload));
-            curl_setopt($curl, CURLOPT_CUSTOMREQUEST, "POST");
-
-            $response = curl_exec($curl);
             // dd($response);
             $log_insert = DB::connection('pgsql_paywrite')->table('ifms.ifms_bill_response_log')->insert([
                 'request_payload'               => json_encode($payload),
@@ -107,12 +106,6 @@ class IfmsApiIntegrationService implements PaymentSBIIntegrationInterface
                 'post_url'                      => $postUrl
             ]);
             // dd($log_insert);
-            if (curl_errno($curl)) {
-                // dd($curl);
-                // dd(curl_error($curl));
-                throw new \Exception('CURL Error: ' . curl_error($curl));
-            }
-            curl_close($curl);
             $responseData = json_decode($response, true);
             if (!isset($responseData['status']) || !$responseData['status']) {
                 throw new \Exception('Authentication failed: ' . ($responseData['errorMessage'] ?? 'Unknown error'));
@@ -173,7 +166,7 @@ class IfmsApiIntegrationService implements PaymentSBIIntegrationInterface
             $responseArray = NULL;
             // $authenticated = $this->authiticated($client_id);
             // $post_url = 'https://uat.wbifms.gov.in/food/main/version/bill-details';
-            $post_url = 'https://www.wbifms.gov.in/food/main/version/bill-details';
+            $post_url = config('ifms.api.base_url').'bill-details';
             // Retrieve auth token and SEK
             // $authToken = Cache::get('IFMS_AUTH');
             // $sek = Cache::get('IFMS_sek'); // base64-encoded SEK
@@ -225,20 +218,26 @@ class IfmsApiIntegrationService implements PaymentSBIIntegrationInterface
             ];
 
             $headers = [
-                'Content-Type: application/json',
-                'clientId: ' . $client_id,
-                'authToken: ' . $authToken,
+                'Content-Type' => 'application/json',
+                'clientId' => $client_id,
+                'authToken' => $authToken,
             ];
 
             // ✅ 5. Send POST request
-            $curl = curl_init($post_url);
-            curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
-            // curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, 0);
-            // curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, 0);
-            curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($curl, CURLOPT_CUSTOMREQUEST, "POST");
-            curl_setopt($curl, CURLOPT_POSTFIELDS, json_encode($requestPayload));
-            $post_response = curl_exec($curl);
+            $client = new Client();
+            try {
+                $guzzleResponse = $client->post($post_url, [
+                    'headers' => $headers,
+                    'body' => json_encode($requestPayload),
+                    'http_errors' => false,
+                ]);
+                $post_response = $guzzleResponse->getBody()->getContents();
+                $httpcode = $guzzleResponse->getStatusCode();
+            } catch (\GuzzleHttp\Exception\GuzzleException $e) {
+                echo 'Guzzle error: ' . $e->getMessage();
+                exit;
+            }
+
             $log_insert = DB::connection('pgsql_paywrite')->table('ifms.ifms_bill_response_log')->insert([
                 'request_payload'               => json_encode($payload),
                 'encrypted_res_payload'         => $post_response,
@@ -248,13 +247,6 @@ class IfmsApiIntegrationService implements PaymentSBIIntegrationInterface
                 'lot_no'                        => $lot_no
             ]);
             // dd($post_response);
-            if (curl_errno($curl)) {
-                echo 'Curl error: ' . curl_error($curl);
-                curl_close($curl);
-                exit;
-            }
-            $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
-            curl_close($curl);
 
             // ✅ 6. Decode and return response
             if ($httpcode !== 200) {
@@ -346,7 +338,7 @@ class IfmsApiIntegrationService implements PaymentSBIIntegrationInterface
             $responseArray = null;
             $res_drn = null;
             // $post_url = 'https://uat.wbifms.gov.in/food/main/version/beneficiary-details'; // FIXED URL (removed extra ///)
-            $post_url = 'https://www.wbifms.gov.in/food/main/version/beneficiary-details';
+            $post_url = config('ifms.api.base_url').'beneficiary-details';
             // $authToken = Cache::get('IFMS_authToken');
             // $sek = Cache::get('IFMS_sek'); // Must be raw decrypted bytes
             // $sek_raw = Cache::get('IFMS_sek_raw');
@@ -373,11 +365,10 @@ class IfmsApiIntegrationService implements PaymentSBIIntegrationInterface
             $authToken = $ifmsCache['IFMS_authToken'];
             $sek = $ifmsCache['IFMS_sek'];
             $sek_raw = $ifmsCache['IFMS_sek_raw'];
-            $curl = curl_init($post_url);
             $headers = [
-                'Content-Type: application/json',
-                'clientId: ' . $client_id,
-                'authToken: ' . $authToken,
+                'Content-Type' => 'application/json',
+                'clientId' => $client_id,
+                'authToken' => $authToken,
             ];
             $jsonPayload = json_encode($jsonData);
             $encryptedData = IFMSEncryptDecrypt::encryptAES256Base64($jsonPayload, $sek);
@@ -386,17 +377,20 @@ class IfmsApiIntegrationService implements PaymentSBIIntegrationInterface
                 'hmac' => $hmac,
                 'data' => $encryptedData
             ]);
-            curl_setopt_array($curl, [
-                CURLOPT_URL => $post_url,
-                CURLOPT_HTTPHEADER => $headers,
-                // CURLOPT_SSL_VERIFYHOST => 0,
-                // CURLOPT_SSL_VERIFYPEER => 0,
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_POST => true,
-                CURLOPT_POSTFIELDS => $payload,  // FIX 2: JSON string must be sent, not an array
-            ]);
+            
+            $client = new Client();
+            try {
+                $guzzleResponse = $client->post($post_url, [
+                    'headers' => $headers,
+                    'body' => $payload,
+                    'http_errors' => false,
+                ]);
+                $post_response = $guzzleResponse->getBody()->getContents();
+                $httpcode = $guzzleResponse->getStatusCode();
+            } catch (\GuzzleHttp\Exception\GuzzleException $e) {
+                dd("GUZZLE ERROR: " . $e->getMessage());
+            }
 
-            $post_response = curl_exec($curl);
             // dd($post_response);
             $log_insert = DB::connection('pgsql_paywrite')->table('ifms.ifms_bill_response_log')->insert([
                 'request_payload'               => json_encode($payload),
@@ -407,13 +401,6 @@ class IfmsApiIntegrationService implements PaymentSBIIntegrationInterface
                 'lot_no'                        => $lot_no
             ]);
             // dd( $post_response);
-            if (curl_errno($curl)) {
-                $response_text = curl_error($curl);
-                curl_close($curl);
-                dd("CURL ERROR: " . $response_text);
-            }
-            $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
-            curl_close($curl);
             if ($httpcode !== 200) {
                 new \Exception('IFMS HTTP ERROR: ' . $httpcode);
             }
@@ -490,7 +477,7 @@ class IfmsApiIntegrationService implements PaymentSBIIntegrationInterface
             $reason = NULL;
             $responseArray = NULL;
             // $post_url = 'https://uat.wbifms.gov.in/food/main/version/get-bill-status';
-            $post_url = 'https://www.wbifms.gov.in/food/main/version/get-bill-status';
+            $post_url = config('ifms.api.base_url').'get-bill-status';
             // $authToken = Cache::get('IFMS_authToken');
             // $sek = Cache::get('IFMS_sek'); // MUST be raw bytes from decrypted SEK
             // $sek_raw = Cache::get('IFMS_sek_raw');
@@ -532,21 +519,25 @@ class IfmsApiIntegrationService implements PaymentSBIIntegrationInterface
                 "data" => $encryptedData
             ]);
             $headers = [
-                'Content-Type: application/json',
-                'clientId: ' . $client_id,
-                'authToken: ' . $authToken,
+                'Content-Type' => 'application/json',
+                'clientId' => $client_id,
+                'authToken' => $authToken,
             ];
 
             // 5️⃣ Send request
-            $curl = curl_init($post_url);
-            curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
-            // curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, 0);
-            // curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, 0);
-            curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
-            curl_setopt($curl, CURLOPT_POST, 1);
-            curl_setopt($curl, CURLOPT_POSTFIELDS, $payload);
+            $client = new Client();
+            try {
+                $guzzleResponse = $client->post($post_url, [
+                    'headers' => $headers,
+                    'body' => $payload,
+                    'http_errors' => false,
+                ]);
+                $response = $guzzleResponse->getBody()->getContents();
+                $httpcode = $guzzleResponse->getStatusCode();
+            } catch (\GuzzleHttp\Exception\GuzzleException $e) {
+                dd("Guzzle Error: " . $e->getMessage());
+            }
 
-            $response = curl_exec($curl);
             $log_insert = DB::connection('pgsql_paywrite')->table('ifms.ifms_bill_response_log')->insert([
                 'request_payload'               => json_encode($payload),
                 'encrypted_res_payload'         => $response,
@@ -555,11 +546,6 @@ class IfmsApiIntegrationService implements PaymentSBIIntegrationInterface
                 'post_url'                      => $post_url,
                 'lot_no'                        => $lot_no
             ]);
-            if (curl_errno($curl)) {
-                dd("Curl Error: " . curl_error($curl));
-            }
-            $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
-            curl_close($curl);
             if ($httpcode !== 200) {
                 new \Exception('IFMS HTTP ERROR: ' . $httpcode);
             }
@@ -639,7 +625,7 @@ class IfmsApiIntegrationService implements PaymentSBIIntegrationInterface
             $responseArray = null;
             $beneficiary_details = null;
             // $post_url = 'https://uat.wbifms.gov.in/food/main/version/payment-success-failure-info';
-            $post_url = 'https://www.wbifms.gov.in/food/main/version/payment-success-failure-info';
+            $post_url = config('ifms.api.base_url').'payment-success-failure-info';
             // $authToken = Cache::get('IFMS_authToken');
             // $sek = Cache::get('IFMS_sek'); // Must be raw decrypted bytes
             // $sek_raw = Cache::get('IFMS_sek_raw');
@@ -666,11 +652,10 @@ class IfmsApiIntegrationService implements PaymentSBIIntegrationInterface
             $authToken = $ifmsCache['IFMS_authToken'];
             $sek = $ifmsCache['IFMS_sek'];
             $sek_raw = $ifmsCache['IFMS_sek_raw'];
-            $curl = curl_init($post_url);
             $headers = [
-                'Content-Type: application/json',
-                'clientId: ' . $client_id,
-                'authToken: ' . $authToken,
+                'Content-Type' => 'application/json',
+                'clientId' => $client_id,
+                'authToken' => $authToken,
             ];
             // dump($drn_no);
             // $jsonPayload = json_encode($drn_no);
@@ -685,17 +670,20 @@ class IfmsApiIntegrationService implements PaymentSBIIntegrationInterface
                 'hmac' => $hmac,
                 'data' => $encryptedData
             ]);
-            curl_setopt_array($curl, [
-                CURLOPT_URL => $post_url,
-                CURLOPT_HTTPHEADER => $headers,
-                // CURLOPT_SSL_VERIFYHOST => 0,
-                // CURLOPT_SSL_VERIFYPEER => 0,
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_POST => true,
-                CURLOPT_POSTFIELDS => $payload,  // FIX 2: JSON string must be sent, not an array
-            ]);
 
-            $post_response = curl_exec($curl);
+            $client = new Client();
+            try {
+                $guzzleResponse = $client->post($post_url, [
+                    'headers' => $headers,
+                    'body' => $payload,
+                    'http_errors' => false,
+                ]);
+                $post_response = $guzzleResponse->getBody()->getContents();
+                $httpcode = $guzzleResponse->getStatusCode();
+            } catch (\GuzzleHttp\Exception\GuzzleException $e) {
+                dd("GUZZLE ERROR: " . $e->getMessage());
+            }
+
             $log_insert = DB::connection('pgsql_paywrite')->table('ifms.ifms_bill_response_log')->insert([
                 'request_payload'               => json_encode($payload),
                 'encrypted_res_payload'         => $post_response,
@@ -705,13 +693,6 @@ class IfmsApiIntegrationService implements PaymentSBIIntegrationInterface
                 'lot_no'                        => $lot_no
             ]);
             //  dd( $post_response);
-            if (curl_errno($curl)) {
-                $response_text = curl_error($curl);
-                curl_close($curl);
-                dd("CURL ERROR: " . $response_text);
-            }
-            $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
-            curl_close($curl);
             if ($httpcode !== 200) {
                 new \Exception('IFMS HTTP ERROR: ' . $httpcode);
             }
@@ -830,7 +811,7 @@ class IfmsApiIntegrationService implements PaymentSBIIntegrationInterface
             $treasuryBalance = null;
             $responseArray = null;
             // $post_url = 'https://uat.wbifms.gov.in/food/main/version/hoa-balance';
-            $post_url = 'https://www.wbifms.gov.in/food/main/version/hoa-balance';
+            $post_url = config('ifms.api.base_url').'hoa-balance';
             // $authToken = Cache::get('IFMS_authToken');
             // $sek = Cache::get('IFMS_sek'); // Must be raw decrypted bytes
             // $sek_raw = Cache::get('IFMS_sek_raw');
@@ -859,11 +840,10 @@ class IfmsApiIntegrationService implements PaymentSBIIntegrationInterface
             $sek_raw = $ifmsCache['IFMS_sek_raw'];
 
             $authToken = $ifmsCache['IFMS_authToken'];
-            $curl = curl_init($post_url);
             $headers = [
-                'Content-Type: application/json',
-                'clientId: ' . $client_id,
-                'authToken: ' . $authToken,
+                'Content-Type' => 'application/json',
+                'clientId' => $client_id,
+                'authToken' => $authToken,
             ];
             // $jsonPayload = json_encode(value: $hoa_arr);
             $jsonPayload = json_encode($hoa_arr, JSON_UNESCAPED_SLASHES);
@@ -883,17 +863,20 @@ class IfmsApiIntegrationService implements PaymentSBIIntegrationInterface
                 'hmac' => $hmac,
                 'data' => $encryptedData
             ]);
-            curl_setopt_array($curl, [
-                CURLOPT_URL => $post_url,
-                CURLOPT_HTTPHEADER => $headers,
-                CURLOPT_RETURNTRANSFER => true,
-                // CURLOPT_SSL_VERIFYHOST => 0,
-                // CURLOPT_SSL_VERIFYPEER => 0,
-                CURLOPT_POST => true,
-                CURLOPT_POSTFIELDS => $payload,  // FIX 2: JSON string must be sent, not an array
-            ]);
+            
+            $client = new Client();
+            try {
+                $guzzleResponse = $client->post($post_url, [
+                    'headers' => $headers,
+                    'body' => $payload,
+                    'http_errors' => false,
+                ]);
+                $post_response = $guzzleResponse->getBody()->getContents();
+                $httpcode = $guzzleResponse->getStatusCode();
+            } catch (\GuzzleHttp\Exception\GuzzleException $e) {
+                dd("GUZZLE ERROR: " . $e->getMessage());
+            }
 
-            $post_response = curl_exec($curl);
             // dd($post_response);
             $log_insert = DB::connection('pgsql_paywrite')->table('ifms.ifms_bill_response_log')->insert([
                 'request_payload'               => json_encode($payload),
@@ -903,13 +886,6 @@ class IfmsApiIntegrationService implements PaymentSBIIntegrationInterface
                 'post_url'                      => $post_url
             ]);
             // dd($log_insert);
-            if (curl_errno($curl)) {
-                $response_text = curl_error($curl);
-                curl_close($curl);
-                dd("CURL ERROR: " . $response_text);
-            }
-            $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
-            curl_close($curl);
             if ($httpcode !== 200) {
                 new \Exception('IFMS HTTP ERROR: ' . $httpcode);
             }

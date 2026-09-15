@@ -3,21 +3,10 @@
 namespace App\Services\Integration\Bandhan;
 
 use App\Models\PaymentLotMaster;
-use App\Models\SbiPaymentLotMasterAdditionalInfo;
-use App\Services\Contracts\PaymentSBIIntegrationInterface;
+use App\Services\Integration\AbstractPaymentIntegrationService;
 
-class BandhanApiIntegrationService implements PaymentSBIIntegrationInterface
+class BandhanApiIntegrationService extends AbstractPaymentIntegrationService
 {
-    private static $instance = null;
-
-    public static function getInstance()
-    {
-        if (self::$instance == null) {
-            self::$instance = new BandhanApiIntegrationService();
-        }
-        return self::$instance;
-    }
-
     public function preparePayload(PaymentLotMaster $lotMaster)
     {
         // TODO: Implement Bandhan API payload generation
@@ -33,25 +22,4 @@ class BandhanApiIntegrationService implements PaymentSBIIntegrationInterface
             'type' => 'blue'
         ];
     }
-
-    public function checkAcknowledge(PaymentLotMaster $lotMaster)
-    {
-        // TODO: Implement Bandhan API acknowledge
-        return [
-            'status' => 1,
-            'msg' => 'Bandhan API acknowledge not yet implemented for Lot - ' . $lotMaster->lot_no,
-            'type' => 'blue'
-        ];
-    }
-
-    public function checkResponse(PaymentLotMaster $lotMaster)
-    {
-        // TODO: Implement Bandhan API response
-        return [
-            'status' => 1,
-            'msg' => 'Bandhan API response not yet implemented for Lot - ' . $lotMaster->lot_no,
-            'type' => 'blue'
-        ];
-    }
 }
-

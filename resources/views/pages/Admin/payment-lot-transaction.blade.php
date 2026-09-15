@@ -147,6 +147,28 @@ middleware(['auth', 'verified']);
 
                 $this->lots = $query->orderBy('lot_no', 'desc')->get();
             };
+            $executeDynamicAction = function ($lotNo, $actionKey) {
+                try {
+                    $lotMaster = \App\Models\PaymentLotMaster::where('lot_no', $lotNo)->firstOrFail();
+                    $service = \App\Services\Integration\PaymentIntegrationFactory::make($lotNo);
+                    
+                    $result = $service->executeAction($lotMaster, $actionKey);
+
+                    if (isset($result['status'])) {
+                        if ($result['status'] == 1) {
+                            session()->flash('status', $result['msg'] ?? 'Action executed successfully.');
+                        } else {
+                            session()->flash('error', $result['msg'] ?? 'Action failed.');
+                        }
+                    } else {
+                        session()->flash('status', 'Action executed.');
+                    }
+                    
+                    $this->search();
+                } catch (\Exception $e) {
+                    session()->flash('error', 'Error executing action for lot ' . $lotNo . ': ' . $e->getMessage());
+                }
+            };
 
             $signAndPush = function ($lotNo) {
                 try {
@@ -177,7 +199,19 @@ middleware(['auth', 'verified']);
                     session()->flash('error', 'Error pushing lot ' . $lotNo . ': ' . $e->getMessage());
                 }
             };
+            $billshare = function ($lotNo) {
+                try {
+                    $lotMaster = \App\Models\PaymentLotMaster::where('lot_no', $lotNo)->firstOrFail();
 
+                    $service = \App\Services\Integration\PaymentIntegrationFactory::make($lotNo);
+                    $service->pushToTarget($lotMaster);
+
+                    session()->flash('status', 'Lot ' . $lotNo . ' successfully shared.');
+                    $this->search();
+                } catch (\Exception $e) {
+                    session()->flash('error', 'Error sharing lot ' . $lotNo . ': ' . $e->getMessage());
+                }
+            };
             $checkAcknowledge = function ($lotNo) {
                 try {
                     $lotMaster = \App\Models\PaymentLotMaster::where('lot_no', $lotNo)->firstOrFail();
@@ -511,17 +545,7 @@ middleware(['auth', 'verified']);
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $lot->created_at ? $lot->created_at->format('d M Y, h:i A') : 'N/A' }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                                            @if(str_contains($paymentModeName, 'sbi'))
-                                                @include('pages.Admin.partials.payment-lot-actions.sbi', ['lot' => $lot, 'integrationType' => $integrationType])
-                                            @elseif(str_contains($paymentModeName, 'bandhan'))
-                                                @include('pages.Admin.partials.payment-lot-actions.bandhan', ['lot' => $lot, 'integrationType' => $integrationType])
-                                            @elseif(str_contains($paymentModeName, 'ifms v3'))
-                                                @include('pages.Admin.partials.payment-lot-actions.ifms_v3', ['lot' => $lot, 'integrationType' => $integrationType])
-                                            @elseif(str_contains($paymentModeName, 'ifms'))
-                                                @include('pages.Admin.partials.payment-lot-actions.ifms', ['lot' => $lot, 'integrationType' => $integrationType])
-                                            @else
-                                                @include('pages.Admin.partials.payment-lot-actions.sbi', ['lot' => $lot, 'integrationType' => $integrationType])
-                                            @endif
+                                            @include('pages.Admin.partials.payment-lot-actions.dynamic-actions', ['lot' => $lot, 'integrationType' => $integrationType])
                                         </td>
                                     </tr>
                                 @endforeach

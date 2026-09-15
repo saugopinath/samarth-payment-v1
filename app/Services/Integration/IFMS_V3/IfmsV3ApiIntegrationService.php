@@ -4,19 +4,10 @@ namespace App\Services\Integration\IFMS_V3;
 
 use App\Models\PaymentLotMaster;
 use App\Models\SbiPaymentLotMasterAdditionalInfo;
-use App\Services\Contracts\PaymentSBIIntegrationInterface;
+use App\Services\Integration\AbstractPaymentIntegrationService;
 
-class IfmsV3ApiIntegrationService implements PaymentSBIIntegrationInterface
+class IfmsV3ApiIntegrationService extends AbstractPaymentIntegrationService
 {
-    private static $instance = null;
-
-    public static function getInstance()
-    {
-        if (self::$instance == null) {
-            self::$instance = new IfmsV3ApiIntegrationService();
-        }
-        return self::$instance;
-    }
 
     public function preparePayload(PaymentLotMaster $lotMaster)
     {

@@ -4,19 +4,10 @@ namespace App\Services\Integration\Bandhan;
 
 use App\Models\PaymentLotMaster;
 use App\Models\SbiPaymentLotMasterAdditionalInfo;
-use App\Services\Contracts\PaymentSBIIntegrationInterface;
+use App\Services\Integration\AbstractPaymentIntegrationService;
 
-class BandhanSftpIntegrationService implements PaymentSBIIntegrationInterface
+class BandhanSftpIntegrationService extends AbstractPaymentIntegrationService
 {
-    private static $instance = null;
-
-    public static function getInstance()
-    {
-        if (self::$instance == null) {
-            self::$instance = new BandhanSftpIntegrationService();
-        }
-        return self::$instance;
-    }
 
     public function preparePayload(PaymentLotMaster $lotMaster)
     {
