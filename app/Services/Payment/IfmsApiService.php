@@ -28,19 +28,10 @@ class IfmsApiService
 
     public function authenticate($client_id, $client_secret)
     {
-        if (config('app.env') === 'local') {
-            Cache::put('IFMS_AUTH', Crypt::encrypt([
-                'client_id'       => $client_id,
-                'IFMS_authToken'  => 'mock_auth_token_123',
-                'IFMS_sek'        => base64_encode(random_bytes(32)),
-                'IFMS_sek_raw'    => 'mock_sek_raw',
-                'IFMS_appKey_raw' => 'mock_app_key',
-            ]), Carbon::now()->addMinutes(30));
-            return true;
-        }
+      
 
         try {
-            $postUrl = config('services.ifms.base_url') . 'authenticate';
+            $postUrl = config('services.ifms.base_url') . 'food/main/version/authenticate';
             $publicKeyPath = storage_path(config('services.ifms.public_key_path', 'app/IFMS/publicKey.pem'));
             
             $symmetricKey = $this->generateAES256Key();
@@ -104,12 +95,10 @@ class IfmsApiService
 
     public function billSharing($payload, $lot_no, $DRNNo, $client_id, $client_secret)
     {
-        if (config('app.env') === 'local') {
-            return true;
-        }
+        
 
         try {
-            $post_url = config('services.ifms.base_url') . 'bill-details';
+            $post_url = config('services.ifms.base_url') . 'food/main/version/bill-details';
             
             $responseArray = $this->sendEncryptedPostRequest(
                 $post_url,
@@ -118,6 +107,7 @@ class IfmsApiService
                 $client_secret,
                 JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
             );
+            dd($responseArray);
 
             if (isset($responseArray['status']) && $responseArray['status'] == true && isset($responseArray['data']) && isset($responseArray['rek']) && isset($responseArray['hmac'])) {
                 return true;
@@ -150,7 +140,7 @@ class IfmsApiService
                 'user_agent' => request()->userAgent()
             ]);
 
-            $post_url = config('services.ifms.base_url') . 'beneficiary-details';
+            $post_url = config('services.ifms.base_url') . 'food/main/version/beneficiary-details';
             
             $responseBody = $this->sendEncryptedPostRequestRaw(
                 $post_url,
@@ -212,7 +202,7 @@ class IfmsApiService
                 'user_agent' => request()->userAgent()
             ]);
 
-            $post_url = config('services.ifms.base_url') . 'get-bill-status';
+            $post_url = config('services.ifms.base_url') . 'food/main/version/get-bill-status';
             $payloadObj = ["drn" => $drn_no];
             
             $responseBody = $this->sendEncryptedPostRequestRaw(
@@ -270,7 +260,7 @@ class IfmsApiService
                 'user_agent' => request()->userAgent()
             ]);
 
-            $post_url = config('services.ifms.base_url') . 'payment-success-failure-info';
+            $post_url = config('services.ifms.base_url') . 'food/main/version/payment-success-failure-info';
             $jsonPayloadObj = ["drn" => $drn_no];
             
             $responseBody = $this->sendEncryptedPostRequestRaw(
@@ -320,7 +310,7 @@ class IfmsApiService
         }
 
         try {
-            $post_url = config('services.ifms.base_url') . 'hoa-balance';
+            $post_url = config('services.ifms.base_url') . 'food/main/version/hoa-balance';
             
             $responseBody = $this->sendEncryptedPostRequestRaw(
                 $post_url,

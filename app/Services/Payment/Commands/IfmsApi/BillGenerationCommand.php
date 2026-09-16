@@ -7,6 +7,8 @@ use App\Models\PaymentLotMaster;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 use App\Services\Payment\IfmsApiService;
+use App\Models\ApiErrorLog;
+use App\Models\ApiStepLog;
 
 class BillGenerationCommand implements PaymentStepCommand
 {
@@ -32,6 +34,7 @@ class BillGenerationCommand implements PaymentStepCommand
         try {
             $lot_no = $lot->lot_no;
             $scheme_id = $lot->scheme_id;
+
             
             // Map the passed-in array values from our Modal to the variables expected by the logic
             $senctionNumber = trim($data['sanction_number'] ?? '');
@@ -44,19 +47,7 @@ class BillGenerationCommand implements PaymentStepCommand
                 return ['status' => 0, 'msg' => 'Required fields are missing.', 'type' => 'red'];
             }
 
-            // Using the requested DB queries
-            $schemeDetail = DB::connection('pgsql_paywrite')->table('m_scheme')
-                ->select('ddo_code', 'party_code', 'hoa_code', 'treasury_code', 'bill_type', 'client_id', 'client_secret')
-                ->where('id', $scheme_id)
-                ->first();
-                
-            $lot_details = DB::connection('pgsql_paywrite')->table('ifms.transaction_lot')
-                ->select('amount_debit')
-                ->where('lot_no', '=', $lot_no)
-                ->where('scheme_id', '=', $scheme_id)
-                ->first();
-                
-            $total_amount = $lot_details ? $lot_details->amount_debit : $lot->total_amount;
+            $total_amount = $lot->total_amount;
             $grossAmount = $total_amount;
             $netAmount =  $total_amount;
             $claimId = NULL;
@@ -65,35 +56,21 @@ class BillGenerationCommand implements PaymentStepCommand
             $schemeCode = '0';
             
             // Safe fallbacks in case schemeDetail is missing in development
-            $treasuryCode = $schemeDetail->treasury_code ?? 'TEST';
-            $ddoCode = $schemeDetail->ddo_code ?? 'TEST';
-            $headofAccount = $schemeDetail->hoa_code ?? 'TEST';
-            $billType = $schemeDetail->bill_type ?? 'TEST';
-            $client_id = $schemeDetail->client_id ?? 'TEST';
-            $client_secret = $schemeDetail->client_secret ?? 'TEST';
+            $treasuryCode = 'TEST';
+            $ddoCode = 'TEST';
+            $headofAccount = 'TEST';
+            $billType = 'TEST';
+            $client_id = 'TEST';
+            $client_secret = 'TEST';
             
-            $nextSequenceResult = DB::connection('pgsql_paywrite')->select("SELECT LPAD(NEXTVAL('ifms.drn_ref_seq')::TEXT, 6, '0') AS seq");
-            $nextSequence = $nextSequenceResult[0]->seq ?? '000001';
-            
-            $partyCode = $schemeDetail->party_code ?? 'TEST';
+            $partyCode = 'TEST';
             $now = Carbon::now();
             $year = $now->format('Y');
             $month = $now->format('m');
+            $nextSequence = '000001';
             $DRNNo = $year . $month . $partyCode . $nextSequence;
-
-            $existing_lot_details = DB::connection('pgsql_paywrite')->table('payment.lot_master')
-                ->select('lot_month', 'lot_year')
-                ->where('scheme_id', $scheme_id)
-                ->first();
                 
-            $existing_filename_details = DB::connection('pgsql_paywrite')->table('payment.lot_master')
-                ->select('ben_count')
-                ->where('scheme_id', $scheme_id)
-                ->where('lot_year', $existing_lot_details->lot_year ?? $lot->lot_year)
-                ->where('lot_month', $existing_lot_details->lot_month ?? $lot->lot_month)
-                ->first();
-                
-            $beneficiaryCount = $existing_filename_details ? $existing_filename_details->ben_count : $lot->ben_count;
+            $beneficiaryCount = 10;
             
             if ($beneficiaryCount <= 100) {
                 $benfFlag = '1';
@@ -139,6 +116,7 @@ class BillGenerationCommand implements PaymentStepCommand
                     ]
                 ]
             ];
+            
             ApiStepLog::create([
                     'user_id'    => auth()->id(),
                     'step_name'  => 'Bill Share',
@@ -202,7 +180,7 @@ class BillGenerationCommand implements PaymentStepCommand
             ApiErrorLog::create([
             'error_message' => $e->getMessage(),
             'stack_trace'   => $e->getTraceAsString(),
-            'request_data'  => is_string($payload) ? $payload : json_encode($payload),
+            'request_data'  => isset($payload) ? (is_string($payload) ? $payload : json_encode($payload)) : null,
             'ip_address'    => request()->ip(),
             'user_agent'    => request()->userAgent(),
              ]);
