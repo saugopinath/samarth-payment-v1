@@ -3,7 +3,6 @@
 $parent_status_code = [
     'common'  => 'payment_lot_status_common',
     'sbi'     =>  'payment_lot_status_sbi',
-    'ifms'    =>  'payment_lot_status_ifms',
     'bandhan' =>  'payment_lot_status_bandhan',
 ];
 
@@ -21,13 +20,6 @@ $status = [
     'sbi' => [
         'signed'               => 'PLSSBISIGN',
     ],
-    'ifms' => [
-        'dotdone'             => 'PLSIFMSDOTDONE',
-        'treasury'             => 'PLSIFMSTreasury',
-        'rbi'                  => 'PLSIFMSRBI',
-        'all_action_done'      => 'PLSIFMSAllActionDone',
-    ]
-    
 ];
 
 $configuration_codes = [
@@ -43,8 +35,6 @@ $lot_types = [
 
 $payment_modes = [
     'sbi' => '5201',
-    'ifms' => '5202',
-    'ifms_v3' => '5203',
     'bandhan' => '5204',
 ];
 
@@ -133,18 +123,6 @@ return [
             "code" => $payment_modes['sbi'],
         ),
         array(
-            "name" => "IFMS",
-            "short_name" => "ifms",
-            "parent_short_code" => "payment_mode",
-            "code" => $payment_modes['ifms'],
-        ),
-        array(
-            "name" => "IFMS V3",
-            "short_name" => "ifms-v3",
-            "parent_short_code" => "payment_mode",
-            "code" => $payment_modes['ifms_v3'],
-        ),
-        array(
             "name" => "Bandhan",
             "short_name" => "Bandhan",
             "parent_short_code" => "payment_mode",
@@ -208,38 +186,7 @@ return [
             "parent_short_code" => $parent_status_code['sbi'],
             "code" => $status['sbi']['signed'],
         ),
-      
-      
-      
         
-        // IFMS Statuses
-      
-        array(
-            "name" => "Treasury",
-            "short_name" => "ifms_treasury",
-            "parent_short_code" => $parent_status_code['ifms'],
-            "code" => $status['ifms']['treasury'],
-        ),
-        array(
-            "name" => "RBI",
-            "short_name" => "ifms_rbi",
-            "parent_short_code" => $parent_status_code['ifms'],
-            "code" => $status['ifms']['rbi'],
-        ),
-        array(
-            "name" => "Ifms Dot Done",
-            "short_name" => "ifms_dotdone",
-            "parent_short_code" => $parent_status_code['ifms'],
-            "code" => $status['ifms']['dotdone'],
-        ),
-        array(
-            "name" => "All Action Done",
-            "short_name" => "ifms_all_action_done",
-            "parent_short_code" => $parent_status_code['ifms'],
-            "code" => $status['ifms']['all_action_done'],
-        )
-        
-       
     ],
 ];
 

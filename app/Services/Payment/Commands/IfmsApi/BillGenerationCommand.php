@@ -152,15 +152,14 @@ class BillGenerationCommand implements PaymentStepCommand
             $bill_share = $this->apiService->billSharing($payload, $lot_no, $DRNNo, $client_id, $client_secret);
             
             if ($bill_share) {
+                $newStatus = Config::get('ifms.status.ifms_api.bill_gen');
+                $next_level_code=Codemaster::where('short_name', $newStatus)->first();
                 DB::connection('pgsql_payment')->beginTransaction();
                 DB::connection('pgsql_ifms')->beginTransaction();
-                
-                $bill_share_to_ifms_status = DB::connection('pgsql_paywrite')->table('payment.lot_master')
-                    ->where('lot_no', $lot_no)
+                $main_update=$lot->update(['cur_status' => $next_level_code->id]);
+                $bill_share_to_ifms_status =IfmsPaymentLotMasterAdditionalInfo::where('lot_no', $lot_no)
                     ->where('scheme_id', $scheme_id)
                     ->update([
-                        'bill_status' => 1, 
-                        'drn_no' => $DRNNo, 
                         'sanctionAmount' => $senctionAmount, 
                         'issueingAuth' => $issueingAuth, 
                         'sanctionNumber' => $senctionNumber, 
@@ -169,19 +168,14 @@ class BillGenerationCommand implements PaymentStepCommand
                         'billDate' => $bill_date
                     ]);
                     
-                DB::connection('pgsql_paywrite')->table('ifms.transaction_lot')
-                    ->where('lot_no', $lot_no)
-                    ->where('scheme_id', $scheme_id)
-                    ->update([
-                        'bill_status' => 1,
-                        'drn_no' => $DRNNo
-                    ]);
+          
                 
-                if ($bill_share_to_ifms_status) {
-                    DB::connection('pgsql_paywrite')->commit();
+                if ($main_update && $bill_share_to_ifms_status) {
+                    DB::connection('pgsql_payment')->commit();
+                    DB::connection('pgsql_ifms')->commit();
                     
                     // Proceed to update the UI status state so the button advances
-                    $lot->update(['cur_status' => 'PLSIFMS_BILL_GEN']);
+                    
                     
                     return [
                         'status' => 1,
@@ -189,7 +183,8 @@ class BillGenerationCommand implements PaymentStepCommand
                         'type' => 'green'
                     ];
                 } else {
-                    DB::connection('pgsql_paywrite')->rollback();
+                    DB::connection('pgsql_payment')->rollback();
+                    DB::connection('pgsql_ifms')->rollback();
                     return [
                         'status' => 0,
                         'msg' => 'Status update error. Please Try again later.',
@@ -204,14 +199,13 @@ class BillGenerationCommand implements PaymentStepCommand
                 ];
             }
         } catch (\Exception $e) {
-            try {
-                DB::connection('pgsql_paywrite')->table('ifms.error_log')->insert([
-                    'exception'  => $e->getMessage(),
-                    'created_at' => date("Y-m-d H:i:s")
-                ]);
-            } catch (\Exception $logE) {
-                // Ignore log insertion errors if table doesn't exist yet
-            }
+            ApiErrorLog::create([
+            'error_message' => $e->getMessage(),
+            'stack_trace'   => $e->getTraceAsString(),
+            'request_data'  => is_string($payload) ? $payload : json_encode($payload),
+            'ip_address'    => request()->ip(),
+            'user_agent'    => request()->userAgent(),
+             ]);
             
             return [
                 'status' => 0,

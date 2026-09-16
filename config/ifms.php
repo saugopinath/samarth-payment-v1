@@ -20,4 +20,17 @@ return [
         'public_key_path' => env('IFMS_PUBLIC_KEY_PATH', 'app/IFMS/publicKey.pem'),
         'jb_private_key_path' => env('IFMS_JB_PRIVATE_KEY_PATH', 'app/IFMS/Jb_key/PrivateKey.pem'),
     ],
+    
+    'status' => [
+        'ifms' => [
+            'dotdone'             => 'PLSIFMSDOTDONE',
+            'treasury'             => 'PLSIFMSTreasury',
+            'rbi'                  => 'PLSIFMSRBI',
+            'all_action_done'      => 'PLSIFMSAllActionDone',
+        ],
+        'ifms_api' => [
+            'bill_gen'             => 'PLSIFMSBillGen',
+            'response'             => 'PLSIFMSR',
+        ]
+    ],
 ];
